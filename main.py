@@ -47,7 +47,7 @@ def homepage(request: Request, db: Session = Depends(get_db)):
         db.query(Article)
         .filter(Article.is_published == True)
         .order_by(Article.positivity_score.desc())
-        .limit(6)
+        .limit(12)
         .all()
     )
     return templates.TemplateResponse("index.html", {"request": request, "articles": articles})
