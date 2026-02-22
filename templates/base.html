@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Pozitivní zprávy{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="bg-[#EFF6FF] text-gray-800 min-h-screen flex flex-col">
+
+  <!-- Header – sticky -->
+  <header class="bg-white shadow-sm border-b-2 border-blue-100 sticky top-0 z-50">
+
+    <!-- Logo – centrovaný -->
+    <div class="max-w-5xl mx-auto px-4 pt-6 pb-2 text-center">
+      <a href="/" class="inline-flex flex-col items-center gap-1 group">
+        <div class="flex items-center gap-3">
+          <span class="text-5xl">🌍</span>
+          <span class="text-3xl font-extrabold tracking-tight text-blue-600 group-hover:text-blue-700 transition-colors">
+            Pozitivní zprávy
+          </span>
+          <span class="text-5xl">✨</span>
+        </div>
+        <p class="text-sm text-blue-400 font-medium tracking-wide mt-0.5">
+          Pozitivní zprávy pro pozitivní den
+        </p>
+      </a>
+    </div>
+
+    <!-- Category navigation -->
+    <nav class="border-t border-blue-100 bg-blue-50 mt-3">
+      <div class="max-w-5xl mx-auto px-4">
+        <ul class="flex items-center gap-1 overflow-x-auto py-0 scrollbar-none justify-center">
+          <li>
+            <a href="/"
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
+                      {% if request.url.path == '/' %}
+                        text-white bg-blue-500 rounded-t-lg
+                      {% else %}
+                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
+                      {% endif %}">
+              🔥 Hot News
+            </a>
+          </li>
+          <li>
+            <a href="/kategorie/ekonomika"
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
+                      {% if '/kategorie/ekonomika' in request.url.path %}
+                        text-white bg-blue-500 rounded-t-lg
+                      {% else %}
+                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
+                      {% endif %}">
+              💼 Ekonomika
+            </a>
+          </li>
+          <li>
+            <a href="/kategorie/domaci"
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
+                      {% if '/kategorie/domaci' in request.url.path %}
+                        text-white bg-blue-500 rounded-t-lg
+                      {% else %}
+                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
+                      {% endif %}">
+              🏠 Domácí
+            </a>
+          </li>
+          <li>
+            <a href="/kategorie/zahranici"
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
+                      {% if '/kategorie/zahranici' in request.url.path %}
+                        text-white bg-blue-500 rounded-t-lg
+                      {% else %}
+                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
+                      {% endif %}">
+              🌍 Zahraničí
+            </a>
+          </li>
+          <li>
+            <a href="/kategorie/sport"
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
+                      {% if '/kategorie/sport' in request.url.path %}
+                        text-white bg-blue-500 rounded-t-lg
+                      {% else %}
+                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
+                      {% endif %}">
+              ⚽ Sport
+            </a>
+          </li>
+          <li>
+            <a href="/archiv"
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap
+                      {% if request.url.path == '/archiv' %}
+                        text-white bg-gray-400 rounded-t-lg
+                      {% else %}
+                        text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-t-lg transition-colors
+                      {% endif %}">
+              📚 Archiv
+            </a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Main content -->
+  <main class="flex-1 max-w-5xl mx-auto px-4 py-10 w-full">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-blue-100 mt-auto">
+    <div class="max-w-5xl mx-auto px-4 py-6 text-center text-sm text-gray-400">
+      <p>🌍 Pozitivní zprávy – každý den vybíráme to nejlepší ze světového zpravodajství</p>
+      <p class="mt-1">
+        Powered by <span class="text-blue-500 font-medium">Claude AI</span> &amp;
+        <span class="text-cyan-500 font-medium">Unsplash</span>
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>

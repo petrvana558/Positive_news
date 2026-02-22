@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin – Pozitivní zprávy</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Admin header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">⚙️</span>
+        <div>
+          <div class="font-bold text-gray-800">Admin panel</div>
+          <div class="text-xs text-gray-400">Pozitivní zprávy</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="/" target="_blank" class="text-sm text-gray-500 hover:text-amber-500">🌐 Web</a>
+        <form method="post" action="/admin/logout" class="inline">
+          <button type="submit" class="text-sm text-red-400 hover:text-red-600">Odhlásit</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-6xl mx-auto px-4 py-6 flex gap-6">
+
+    <!-- Sidebar -->
+    <aside class="w-52 flex-shrink-0">
+      <nav class="space-y-1">
+        {% set tabs = [
+          ('dashboard', '📊', 'Dashboard', '/admin'),
+          ('keywords', '🔑', 'Klíčová slova', '/admin/keywords'),
+          ('sources', '📡', 'RSS zdroje', '/admin/sources'),
+          ('articles', '📰', 'Články', '/admin/articles'),
+          ('stats', '📈', 'Statistiky', '/admin/stats'),
+        ] %}
+        {% for tab_id, icon, label, href in tabs %}
+          <a href="{{ href }}"
+             class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                    {% if active_tab == tab_id %}bg-amber-100 text-amber-700{% else %}text-gray-600 hover:bg-gray-100{% endif %}">
+            <span>{{ icon }}</span> {{ label }}
+          </a>
+        {% endfor %}
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1">
+
+      {% if active_tab == 'dashboard' %}
+        {% if request.query_params.get('triggered') %}
+          <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg mb-6 text-sm">
+            ✅ Scrape job byl spuštěn na pozadí. Výsledky se zobrazí za chvíli.
+          </div>
+        {% endif %}
+        {% if request.query_params.get('saved') %}
+          <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg mb-6 text-sm">
+            ✅ Nastavení uloženo.
+          </div>
+        {% endif %}
+
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Dashboard</h1>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {% for value, label, color in [
+            (articles_count, 'Celkem článků', 'amber'),
+            (published_count, 'Publikovaných', 'emerald'),
+            (keywords_count, 'Klíčových slov', 'blue'),
+            (sources_count, 'Aktivních zdrojů', 'purple'),
+          ] %}
+            <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div class="text-3xl font-bold text-{{ color }}-500">{{ value }}</div>
+              <div class="text-xs text-gray-500 mt-1">{{ label }}</div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <!-- Manual trigger + live progress -->
+        <div class="bg-white rounded-xl p-5 shadow-sm mb-8">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold text-gray-700">Scraping</h2>
+            <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-gray-300"></span>
+          </div>
+
+          <!-- Live progress box (skryté dokud neběží) -->
+          <div id="progress-box" class="hidden mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm">
+            <div class="flex items-center justify-between mb-2">
+              <span id="phase-label" class="font-medium text-amber-700"></span>
+              <span id="elapsed-label" class="text-gray-400 text-xs"></span>
+            </div>
+            <div id="phase-detail" class="text-gray-500 text-xs mb-3"></div>
+            <!-- Progress bar (jen při hodnocení) -->
+            <div id="progress-bar-wrap" class="hidden">
+              <div class="w-full bg-amber-100 rounded-full h-2">
+                <div id="progress-bar" class="bg-amber-400 h-2 rounded-full transition-all duration-300" style="width:0%"></div>
+              </div>
+              <div class="flex justify-between text-xs text-gray-400 mt-1">
+                <span id="progress-text"></span>
+                <span id="eta-text"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Výsledek posledního runu -->
+          <div id="last-run" class="text-xs text-gray-400 mb-4"></div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <form method="post" action="/admin/trigger">
+              <button type="submit" id="trigger-btn"
+                      class="bg-amber-400 hover:bg-amber-500 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors text-sm">
+                🔄 Spustit scrape nyní
+              </button>
+            </form>
+            <!-- Interval selector -->
+            <form method="post" action="/admin/settings/interval" class="flex items-center gap-2">
+              <label class="text-sm text-gray-500 whitespace-nowrap">Interval:</label>
+              <select name="hours"
+                      onchange="this.form.submit()"
+                      class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white">
+                {% for h, label in [(0.5,'30 min'),(1,'1 hod'),(2,'2 hod'),(3,'3 hod'),(4,'4 hod'),(6,'6 hod'),(12,'12 hod'),(24,'24 hod')] %}
+                  <option value="{{ h }}" {% if scrape_interval == h %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </form>
+            <!-- Min. skóre -->
+            <form method="post" action="/admin/settings/min-score" class="flex items-center gap-2">
+              <label class="text-sm text-gray-500 whitespace-nowrap" title="Článek musí mít alespoň toto skóre, aby byl publikován">Min. skóre:</label>
+              <input type="number" name="score" step="0.5" min="1" max="10"
+                     value="{{ min_score }}"
+                     class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm w-16 focus:outline-none focus:ring-2 focus:ring-amber-400 text-center" />
+              <button type="submit" class="text-xs text-amber-600 hover:text-amber-800 font-medium">Uložit</button>
+            </form>
+          </div>
+
+          <!-- Jak se počítá skóre -->
+          <details class="mt-4 text-xs text-gray-400">
+            <summary class="cursor-pointer hover:text-gray-600 select-none">ℹ️ Jak se počítá skóre?</summary>
+            <div class="mt-2 bg-gray-50 rounded-lg p-3 space-y-1 text-gray-500">
+              <p><strong>1. Claude Haiku</strong> ohodnotí titulek + perex na škále 1–10 (cena ~$0.001/článek)</p>
+              <p><strong>2. Keyword boost</strong> ±0.3 × váha za každé klíčové slovo nalezené v textu (zdarma)</p>
+              <p><strong>Výsledné skóre</strong> = Claude skóre + keyword boost, oříznuté na &lt;1, 10&gt;</p>
+              <p><strong>Pre-filtr:</strong> Claude ohodnotí jen top {{ 25 }} kandidátů (seřazených dle keyword boostu), zbytek dostane skóre 1–4 automaticky.</p>
+              <p><strong>Publikování:</strong> Z ohodnocených se vybere max 6 článků se skóre ≥ min. skóre a pro každý se zavolá Claude Sonnet (generování textu, cena ~$0.02/článek).</p>
+            </div>
+          </details>
+        </div>
+
+        <script>
+          const PHASES = {
+            idle:       { label: '⏸ Čeká',           color: 'text-gray-500' },
+            fetching:   { label: '📡 Stahuje feedy',  color: 'text-blue-600' },
+            evaluating: { label: '🤖 Hodnotí články', color: 'text-amber-600' },
+            generating: { label: '✍️ Generuje text',  color: 'text-purple-600' },
+            done:       { label: '✅ Hotovo',          color: 'text-emerald-600' },
+            error:      { label: '❌ Chyba',           color: 'text-red-600' },
+          };
+
+          let pollTimer = null;
+          let evalStartTime = null;
+          let evalRatesPerSec = [];
+
+          function fmtSecs(s) {
+            if (s < 60) return s + ' s';
+            return Math.floor(s/60) + ' min ' + (s%60) + ' s';
+          }
+
+          async function poll() {
+            try {
+              const r = await fetch('/admin/scrape-status');
+              const s = await r.json();
+              renderStatus(s);
+              if (s.running) {
+                pollTimer = setTimeout(poll, 1500);
+              } else {
+                pollTimer = setTimeout(poll, 10000);
+              }
+            } catch(e) {
+              pollTimer = setTimeout(poll, 5000);
+            }
+          }
+
+          function renderStatus(s) {
+            const dot = document.getElementById('status-dot');
+            const box = document.getElementById('progress-box');
+            const phaseLbl = document.getElementById('phase-label');
+            const elapsedLbl = document.getElementById('elapsed-label');
+            const detail = document.getElementById('phase-detail');
+            const barWrap = document.getElementById('progress-bar-wrap');
+            const bar = document.getElementById('progress-bar');
+            const progText = document.getElementById('progress-text');
+            const etaText = document.getElementById('eta-text');
+            const lastRun = document.getElementById('last-run');
+            const btn = document.getElementById('trigger-btn');
+
+            const p = PHASES[s.phase] || PHASES.idle;
+
+            // Tečka
+            dot.className = 'inline-block w-2.5 h-2.5 rounded-full ' +
+              (s.running ? 'bg-amber-400 animate-pulse' :
+               s.phase === 'done' ? 'bg-emerald-400' :
+               s.phase === 'error' ? 'bg-red-400' : 'bg-gray-300');
+
+            // Box
+            if (s.running || s.phase === 'done' || s.phase === 'error') {
+              box.classList.remove('hidden');
+            } else {
+              box.classList.add('hidden');
+            }
+
+            phaseLbl.textContent = p.label;
+            phaseLbl.className = 'font-medium ' + p.color;
+            elapsedLbl.textContent = s.elapsed_secs ? fmtSecs(s.elapsed_secs) : '';
+            detail.textContent = s.phase_detail || '';
+
+            // Progress bar (jen fáze evaluating)
+            if (s.phase === 'evaluating' && s.total_to_evaluate > 0) {
+              barWrap.classList.remove('hidden');
+              const pct = Math.round(s.evaluated / s.total_to_evaluate * 100);
+              bar.style.width = pct + '%';
+              progText.textContent = s.evaluated + ' / ' + s.total_to_evaluate + ' článků';
+
+              // ETA
+              if (s.evaluated > 0 && s.elapsed_secs > 0) {
+                const secsPerArticle = s.elapsed_secs / s.evaluated;
+                const remaining = Math.ceil((s.total_to_evaluate - s.evaluated) * secsPerArticle);
+                etaText.textContent = 'zbývá ~' + fmtSecs(remaining);
+              }
+            } else {
+              barWrap.classList.add('hidden');
+            }
+
+            // Poslední run
+            if (s.last_run_at) {
+              lastRun.textContent = 'Poslední run: ' + s.last_run_at + ' – ' + (s.last_run_result || '');
+            }
+
+            // Tlačítko
+            btn.disabled = s.running;
+            btn.classList.toggle('opacity-50', s.running);
+            btn.classList.toggle('cursor-not-allowed', s.running);
+          }
+
+          poll();
+        </script>
+
+        <!-- Recent articles -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-100">
+            <h2 class="font-semibold text-gray-700">Poslední články</h2>
+          </div>
+          <div class="divide-y divide-gray-50">
+            {% for a in recent_articles %}
+              <div class="px-5 py-3 flex items-center gap-4 text-sm">
+                <span class="text-amber-500 font-bold w-8">{{ "%.1f"|format(a.positivity_score) }}</span>
+                <a href="/clanek/{{ a.id }}" target="_blank"
+                   class="flex-1 text-gray-700 hover:text-amber-500 truncate">{{ a.title }}</a>
+                {% if a.is_published %}
+                  <span class="text-xs bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full">Živý</span>
+                {% endif %}
+                <span class="text-gray-300 text-xs">{{ a.created_at.strftime('%d.%m %H:%M') if a.created_at else '' }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+      {% elif active_tab == 'keywords' %}
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Klíčová slova</h1>
+
+        <!-- Add keyword form -->
+        <div class="bg-white rounded-xl p-5 shadow-sm mb-6">
+          <h2 class="font-semibold text-gray-700 mb-4">Přidat klíčové slovo</h2>
+          <form method="post" action="/admin/keywords/add" class="flex flex-wrap gap-3 items-end">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Slovo</label>
+              <input type="text" name="word" required placeholder="např. úspěch"
+                     class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 w-40" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Váha (0.1 – 3.0)</label>
+              <input type="number" name="weight" step="0.1" min="0.1" max="3" value="1.0"
+                     class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 w-28" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Typ</label>
+              <select name="keyword_type"
+                      class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <option value="positive">✅ Pozitivní</option>
+                <option value="negative">❌ Negativní</option>
+              </select>
+            </div>
+            <button type="submit"
+                    class="bg-amber-400 hover:bg-amber-500 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
+              Přidat
+            </button>
+          </form>
+        </div>
+
+        <!-- Keywords table -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">Slovo</th>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">Váha</th>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">Typ</th>
+                <th class="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              {% for kw in keywords %}
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 font-medium">{{ kw.word }}</td>
+                  <td class="px-4 py-3 text-gray-500">{{ kw.weight }}</td>
+                  <td class="px-4 py-3">
+                    {% if kw.keyword_type == 'positive' %}
+                      <span class="text-xs bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full">✅ Pozitivní</span>
+                    {% else %}
+                      <span class="text-xs bg-red-100 text-red-500 px-2 py-1 rounded-full">❌ Negativní</span>
+                    {% endif %}
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    <form method="post" action="/admin/keywords/{{ kw.id }}/delete" class="inline">
+                      <button type="submit" class="text-xs text-red-400 hover:text-red-600"
+                              onclick="return confirm('Smazat slovo \'{{ kw.word }}\'?')">Smazat</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      {% elif active_tab == 'sources' %}
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">RSS zdroje</h1>
+
+        <!-- Add source form -->
+        <div class="bg-white rounded-xl p-5 shadow-sm mb-6">
+          <h2 class="font-semibold text-gray-700 mb-4">Přidat RSS zdroj</h2>
+          <form method="post" action="/admin/sources/add" class="flex flex-wrap gap-3 items-end">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Název</label>
+              <input type="text" name="name" required placeholder="např. CNN"
+                     class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 w-40" />
+            </div>
+            <div class="flex-1 min-w-64">
+              <label class="block text-xs text-gray-500 mb-1">URL RSS feedu</label>
+              <input type="url" name="url" required placeholder="https://..."
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Jazyk</label>
+              <select name="language"
+                      class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <option value="cs">🇨🇿 Čeština</option>
+                <option value="en">🇬🇧 Angličtina</option>
+              </select>
+            </div>
+            <button type="submit"
+                    class="bg-amber-400 hover:bg-amber-500 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
+              Přidat
+            </button>
+          </form>
+        </div>
+
+        <!-- Sources table -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">Název</th>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">Jazyk</th>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">URL</th>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">Stav</th>
+                <th class="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              {% for src in sources %}
+                <tr class="hover:bg-gray-50 {% if not src.enabled %}opacity-50{% endif %}">
+                  <td class="px-4 py-3 font-medium">{{ src.name }}</td>
+                  <td class="px-4 py-3 text-gray-500">{{ '🇨🇿' if src.language == 'cs' else '🇬🇧' }}</td>
+                  <td class="px-4 py-3 text-gray-400 max-w-xs truncate">
+                    <a href="{{ src.url }}" target="_blank" class="hover:text-amber-500">{{ src.url[:50] }}…</a>
+                  </td>
+                  <td class="px-4 py-3">
+                    {% if src.enabled %}
+                      <span class="text-xs bg-emerald-100 text-emerald-600 px-2 py-1 rounded-full">✅ Aktivní</span>
+                    {% else %}
+                      <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">⏸ Vypnutý</span>
+                    {% endif %}
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    <form method="post" action="/admin/sources/{{ src.id }}/toggle" class="inline">
+                      <button type="submit" class="text-xs text-amber-500 hover:text-amber-700">
+                        {{ 'Vypnout' if src.enabled else 'Zapnout' }}
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      {% elif active_tab == 'articles' %}
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Přehled článků</h1>
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">Titulek</th>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">Skóre</th>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">Zdroj</th>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">Stav</th>
+                <th class="px-4 py-3 text-left text-gray-600 font-medium">Datum</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              {% for a in all_articles %}
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3">
+                    <a href="/clanek/{{ a.id }}" target="_blank"
+                       class="text-gray-700 hover:text-amber-500 font-medium line-clamp-1">{{ a.title }}</a>
+                  </td>
+                  <td class="px-4 py-3 font-bold text-amber-500">{{ "%.1f"|format(a.positivity_score) }}</td>
+                  <td class="px-4 py-3 text-gray-400 text-xs">{{ a.source_name }}</td>
+                  <td class="px-4 py-3">
+                    {% if a.is_published %}
+                      <span class="text-xs bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full">Živý</span>
+                    {% else %}
+                      <span class="text-xs text-gray-300">Archiv</span>
+                    {% endif %}
+                  </td>
+                  <td class="px-4 py-3 text-gray-400 text-xs">
+                    {{ a.created_at.strftime('%d.%m.%Y %H:%M') if a.created_at else '' }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% elif active_tab == 'stats' %}
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-2xl font-bold text-gray-800">Statistiky článků</h1>
+          <span class="text-sm text-gray-400">{{ stats_total }} článků celkem</span>
+        </div>
+
+        {# Makro pro záhlaví s řazením #}
+        {% macro th(col, label, align='center') %}
+          {% set new_dir = 'asc' if (stats_sort == col and stats_dir == 'desc') else 'desc' %}
+          <th class="px-4 py-3 text-{{ align }} text-gray-500 font-medium whitespace-nowrap">
+            <a href="/admin/stats?sort={{ col }}&dir={{ new_dir }}&page=1"
+               class="inline-flex items-center gap-1 hover:text-gray-800
+                      {{ 'text-gray-800 font-bold' if stats_sort == col else '' }}">
+              {{ label }}
+              {% if stats_sort == col %}
+                <span class="text-xs">{{ '↑' if stats_dir == 'asc' else '↓' }}</span>
+              {% endif %}
+            </a>
+          </th>
+        {% endmacro %}
+
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b border-gray-100">
+              <tr>
+                {{ th('title',    'Článek',       'left') }}
+                {{ th('views',    '👁 Zobrazení') }}
+                {{ th('clicks',   '🔗 Prokliky') }}
+                {{ th('rating',   '⭐ Hodnocení') }}
+                {{ th('comments', '💬 Komentáře') }}
+                {{ th('date',     'Přidáno',      'left') }}
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              {% for row in stats %}
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 max-w-xs">
+                    <a href="/clanek/{{ row.article.id }}" target="_blank"
+                       class="text-gray-700 hover:text-amber-500 font-medium line-clamp-1">{{ row.article.title }}</a>
+                    <div class="text-xs text-gray-400 mt-0.5">{{ row.article.source_name }}</div>
+                  </td>
+                  <td class="px-4 py-3 text-center font-semibold {% if row.views > 0 %}text-blue-600{% else %}text-gray-300{% endif %}">
+                    {{ row.views }}
+                  </td>
+                  <td class="px-4 py-3 text-center font-semibold {% if row.clicks > 0 %}text-emerald-600{% else %}text-gray-300{% endif %}">
+                    {{ row.clicks }}
+                  </td>
+                  <td class="px-4 py-3 text-center">
+                    {% if row.avg_rating %}
+                      <span class="font-semibold text-yellow-500">{{ row.avg_rating }}</span>
+                      <span class="text-xs text-gray-400">/5 ({{ row.rating_count }}×)</span>
+                    {% else %}
+                      <span class="text-gray-300">–</span>
+                    {% endif %}
+                  </td>
+                  <td class="px-4 py-3 text-center font-semibold {% if row.comments > 0 %}text-purple-600{% else %}text-gray-300{% endif %}">
+                    {{ row.comments }}
+                  </td>
+                  <td class="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                    {{ row.article.created_at.strftime('%d.%m.%Y %H:%M') if row.article.created_at else '' }}
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="6" class="px-4 py-8 text-center text-gray-400">Žádné články v databázi</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <!-- Stránkování -->
+          {% if stats_total_pages > 1 %}
+            <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between text-sm">
+              <span class="text-gray-400">
+                Strana {{ stats_page }} z {{ stats_total_pages }}
+                &nbsp;·&nbsp; zobrazeno {{ stats.items()|list|length if stats is mapping else stats|length }} z {{ stats_total }}
+              </span>
+              <div class="flex gap-1">
+                {% if stats_page > 1 %}
+                  <a href="/admin/stats?sort={{ stats_sort }}&dir={{ stats_dir }}&page={{ stats_page - 1 }}"
+                     class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-100 text-gray-600">← Předchozí</a>
+                {% endif %}
+                {% for p in range(1, stats_total_pages + 1) %}
+                  {% if p == stats_page %}
+                    <span class="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg font-semibold">{{ p }}</span>
+                  {% elif p <= 3 or p > stats_total_pages - 3 or (p >= stats_page - 1 and p <= stats_page + 1) %}
+                    <a href="/admin/stats?sort={{ stats_sort }}&dir={{ stats_dir }}&page={{ p }}"
+                       class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-100 text-gray-600">{{ p }}</a>
+                  {% elif p == 4 or p == stats_total_pages - 3 %}
+                    <span class="px-2 py-1.5 text-gray-400">…</span>
+                  {% endif %}
+                {% endfor %}
+                {% if stats_page < stats_total_pages %}
+                  <a href="/admin/stats?sort={{ stats_sort }}&dir={{ stats_dir }}&page={{ stats_page + 1 }}"
+                     class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-100 text-gray-600">Další →</a>
+                {% endif %}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+
+      {% endif %}
+
+    </main>
+  </div>
+
+</body>
+</html>

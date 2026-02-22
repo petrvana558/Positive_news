@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} – Pozitivní zprávy{% endblock %}
+
+{% block content %}
+  <article class="max-w-3xl mx-auto">
+    <!-- Breadcrumb -->
+    <nav class="text-sm text-gray-400 mb-6">
+      <a href="/" class="hover:text-blue-500">Domů</a>
+      <span class="mx-2">›</span>
+      <span class="text-gray-600">Článek</span>
+    </nav>
+
+    <!-- Score badge + source + date -->
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <span class="score-badge">
+        ⭐ {{ "%.1f"|format(article.positivity_score) }}/10 pozitivity
+      </span>
+      <span class="text-sm text-gray-400">{{ article.source_name }}</span>
+      <span class="text-sm text-gray-300">·</span>
+      <span class="text-sm text-gray-400">
+        📅 {{ article.created_at.strftime('%d. %m. %Y') if article.created_at else '' }}
+      </span>
+    </div>
+
+    <!-- Title -->
+    <h1 class="text-3xl md:text-4xl font-bold text-gray-800 leading-tight mb-6">
+      {{ article.title }}
+    </h1>
+
+    <!-- Hero image -->
+    {% if article.image_url %}
+      <figure class="mb-8 rounded-2xl overflow-hidden shadow-md">
+        <img
+          src="{{ article.image_url }}"
+          alt="{{ article.image_alt or article.title }}"
+          class="w-full h-72 md:h-96 object-cover"
+        />
+      </figure>
+    {% endif %}
+
+    <!-- Content -->
+    <div class="prose-custom">
+      {% for paragraph in article.content.split('\n\n') %}
+        {% if paragraph.strip() %}
+          <p class="text-gray-700 text-lg leading-relaxed mb-5">{{ paragraph.strip() }}</p>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <!-- Divider -->
+    <hr class="border-blue-100 my-8" />
+
+    <!-- Original source link (tracked redirect) -->
+    <div class="bg-blue-50 border border-blue-100 rounded-xl p-5 flex items-start gap-4">
+      <span class="text-2xl">🔗</span>
+      <div>
+        <p class="text-sm text-gray-500 mb-1">Původní zpráva ze zdroje <strong>{{ article.source_name }}</strong>:</p>
+        <a href="/clanek/{{ article.id }}/original"
+           target="_blank"
+           rel="noopener noreferrer"
+           class="text-blue-600 hover:text-blue-700 font-semibold underline break-all">
+          Číst originál →
+        </a>
+      </div>
+    </div>
+
+    <!-- Reader rating -->
+    <div id="hodnoceni" class="bg-white border border-blue-100 rounded-xl p-5 mt-6 shadow-sm">
+      <h3 class="font-semibold text-gray-700 mb-1">Ohodnoťte článek</h3>
+      {% if avg_rating %}
+        <p class="text-sm text-gray-400 mb-3">
+          Průměr: <strong class="text-gray-600">{{ avg_rating }}/5</strong>
+          &nbsp;({{ rating_count }} {{ 'hodnocení' if rating_count != 1 else 'hodnocení' }})
+        </p>
+      {% else %}
+        <p class="text-sm text-gray-400 mb-3">Zatím bez hodnocení – buďte první!</p>
+      {% endif %}
+      <form method="post" action="/clanek/{{ article.id }}/rate" class="flex gap-2">
+        {% for star in [1, 2, 3, 4, 5] %}
+          <button type="submit" name="rating" value="{{ star }}"
+                  title="{{ star }} hvězdička"
+                  class="text-4xl leading-none text-gray-200 hover:text-yellow-400 transition-colors focus:outline-none">★</button>
+        {% endfor %}
+      </form>
+    </div>
+
+    <!-- Back navigation -->
+    <div class="mt-8 flex gap-4">
+      <a href="/"
+         class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-3 rounded-full transition-colors">
+        ← Zpět na hlavní stránku
+      </a>
+      <a href="/archiv"
+         class="inline-block border-2 border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-500 font-semibold px-6 py-3 rounded-full transition-colors">
+        Archiv článků
+      </a>
+    </div>
+  </article>
+
+  <!-- Discussion -->
+  <div id="diskuze" class="max-w-3xl mx-auto mt-12">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">
+      Diskuze
+      <span class="text-base font-normal text-gray-400 ml-2">({{ comments|length }})</span>
+    </h2>
+
+    <!-- Existing comments -->
+    {% for comment in comments %}
+      <div class="bg-white border border-gray-100 rounded-xl p-4 mb-3 shadow-sm">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="font-semibold text-gray-700 text-sm">{{ comment.author_name }}</span>
+          <span class="text-gray-300 text-xs">·</span>
+          <span class="text-xs text-gray-400">{{ comment.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+        </div>
+        <p class="text-gray-600 text-sm leading-relaxed">{{ comment.content }}</p>
+      </div>
+    {% else %}
+      <p class="text-gray-400 text-sm mb-4">Zatím žádné komentáře. Buďte první!</p>
+    {% endfor %}
+
+    <!-- Add comment form -->
+    <div class="bg-white border border-blue-100 rounded-xl p-5 mt-4 shadow-sm">
+      <h3 class="font-semibold text-gray-700 mb-3">Přidat komentář</h3>
+      <form method="post" action="/clanek/{{ article.id }}/comment" class="space-y-3">
+        <input type="text" name="author_name" placeholder="Vaše jméno (nepovinné)"
+               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        <textarea name="content" required rows="4" placeholder="Napište svůj komentář…"
+                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"></textarea>
+        <button type="submit"
+                class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors">
+          Odeslat komentář
+        </button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

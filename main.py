@@ -1,0 +1,449 @@
+import logging
+import os
+from contextlib import asynccontextmanager
+from datetime import datetime
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, Depends, Form, Request, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+
+load_dotenv()
+
+from database import get_db, init_db, Article, Keyword, NewsSource, Comment, ArticleRating, ArticleView
+from auth import (
+    SESSION_COOKIE, create_session_token, is_authenticated,
+    require_auth, verify_admin_password
+)
+from scheduler import start_scheduler, stop_scheduler, trigger_manual, get_status, set_interval, get_interval, get_min_score, set_min_score
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    start_scheduler()
+    yield
+    stop_scheduler()
+
+
+app = FastAPI(title="Pozitivní zprávy", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+
+# ─── Veřejné stránky ───────────────────────────────────────────────────────────
+
+@app.get("/", response_class=HTMLResponse)
+def homepage(request: Request, db: Session = Depends(get_db)):
+    articles = (
+        db.query(Article)
+        .filter(Article.is_published == True)
+        .order_by(Article.positivity_score.desc())
+        .limit(6)
+        .all()
+    )
+    return templates.TemplateResponse("index.html", {"request": request, "articles": articles})
+
+
+@app.get("/clanek/{article_id}", response_class=HTMLResponse)
+def article_detail(article_id: int, request: Request, db: Session = Depends(get_db)):
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Článek nenalezen")
+
+    # Track page open
+    db.add(ArticleView(article_id=article_id, view_type="open"))
+    db.commit()
+
+    comments = (
+        db.query(Comment)
+        .filter(Comment.article_id == article_id)
+        .order_by(Comment.created_at.asc())
+        .all()
+    )
+    ratings = db.query(ArticleRating).filter(ArticleRating.article_id == article_id).all()
+    avg_rating = round(sum(r.rating for r in ratings) / len(ratings), 1) if ratings else None
+    rating_count = len(ratings)
+
+    return templates.TemplateResponse("article.html", {
+        "request": request,
+        "article": article,
+        "comments": comments,
+        "avg_rating": avg_rating,
+        "rating_count": rating_count,
+    })
+
+
+@app.get("/clanek/{article_id}/original")
+def article_original(article_id: int, db: Session = Depends(get_db)):
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Článek nenalezen")
+    db.add(ArticleView(article_id=article_id, view_type="click"))
+    db.commit()
+    return RedirectResponse(article.original_url, status_code=302)
+
+
+@app.post("/clanek/{article_id}/comment")
+def add_comment(
+    article_id: int,
+    request: Request,
+    author_name: str = Form(""),
+    content: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    if content.strip():
+        db.add(Comment(
+            article_id=article_id,
+            author_name=author_name.strip() or "Anonym",
+            content=content.strip(),
+        ))
+        db.commit()
+    return RedirectResponse(f"/clanek/{article_id}#diskuze", status_code=302)
+
+
+@app.post("/clanek/{article_id}/rate")
+def rate_article(
+    article_id: int,
+    rating: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    if 1 <= rating <= 5:
+        db.add(ArticleRating(article_id=article_id, rating=rating))
+        db.commit()
+    return RedirectResponse(f"/clanek/{article_id}#hodnoceni", status_code=302)
+
+
+@app.get("/archiv", response_class=HTMLResponse)
+def archive(request: Request, db: Session = Depends(get_db)):
+    articles = (
+        db.query(Article)
+        .order_by(Article.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    return templates.TemplateResponse("archive.html", {"request": request, "articles": articles})
+
+
+CATEGORY_NAMES = {
+    "ekonomika": "Ekonomika",
+    "domaci": "Domácí",
+    "zahranici": "Zahraničí",
+    "sport": "Sport",
+    "ostatni": "Ostatní",
+}
+
+
+@app.get("/kategorie/{category}", response_class=HTMLResponse)
+def category_page(category: str, request: Request, db: Session = Depends(get_db)):
+    if category not in CATEGORY_NAMES:
+        raise HTTPException(status_code=404, detail="Kategorie nenalezena")
+    articles = (
+        db.query(Article)
+        .filter(Article.category == category)
+        .order_by(Article.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    return templates.TemplateResponse("archive.html", {
+        "request": request,
+        "articles": articles,
+        "page_title": f"{CATEGORY_NAMES[category]} 📰",
+        "page_subtitle": f"Pozitivní zprávy v kategorii {CATEGORY_NAMES[category]}",
+    })
+
+
+# ─── Admin: přihlášení ────────────────────────────────────────────────────────
+
+@app.get("/admin/login", response_class=HTMLResponse)
+def admin_login_page(request: Request):
+    if is_authenticated(request):
+        return RedirectResponse("/admin", status_code=302)
+    return templates.TemplateResponse("login.html", {"request": request, "error": None})
+
+
+@app.post("/admin/login")
+def admin_login(request: Request, password: str = Form(...)):
+    if verify_admin_password(password):
+        token = create_session_token()
+        response = RedirectResponse("/admin", status_code=302)
+        response.set_cookie(
+            SESSION_COOKIE, token,
+            httponly=True, samesite="lax", max_age=60 * 60 * 8
+        )
+        return response
+    return templates.TemplateResponse(
+        "login.html", {"request": request, "error": "Špatné heslo"}, status_code=401
+    )
+
+
+@app.post("/admin/logout")
+def admin_logout():
+    response = RedirectResponse("/admin/login", status_code=302)
+    response.delete_cookie(SESSION_COOKIE)
+    return response
+
+
+# ─── Admin: hlavní panel ───────────────────────────────────────────────────────
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_panel(request: Request, db: Session = Depends(get_db)):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+
+    articles_count = db.query(Article).count()
+    published_count = db.query(Article).filter(Article.is_published == True).count()
+    keywords_count = db.query(Keyword).count()
+    sources_count = db.query(NewsSource).filter(NewsSource.enabled == True).count()
+
+    recent = (
+        db.query(Article)
+        .order_by(Article.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "articles_count": articles_count,
+        "published_count": published_count,
+        "keywords_count": keywords_count,
+        "sources_count": sources_count,
+        "recent_articles": recent,
+        "scrape_interval": get_interval(),
+        "min_score": get_min_score(),
+        "active_tab": "dashboard",
+    })
+
+
+# ─── Admin: klíčová slova ──────────────────────────────────────────────────────
+
+@app.get("/admin/keywords", response_class=HTMLResponse)
+def admin_keywords(request: Request, db: Session = Depends(get_db)):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+
+    keywords = db.query(Keyword).order_by(Keyword.keyword_type, Keyword.word).all()
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "keywords": keywords,
+        "active_tab": "keywords",
+    })
+
+
+@app.post("/admin/keywords/add")
+def admin_keywords_add(
+    request: Request,
+    word: str = Form(...),
+    weight: float = Form(...),
+    keyword_type: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+
+    word = word.strip().lower()
+    if not word:
+        return RedirectResponse("/admin/keywords", status_code=302)
+
+    existing = db.query(Keyword).filter(Keyword.word == word).first()
+    if existing:
+        existing.weight = weight
+        existing.keyword_type = keyword_type
+    else:
+        db.add(Keyword(word=word, weight=abs(weight), keyword_type=keyword_type))
+    db.commit()
+    return RedirectResponse("/admin/keywords", status_code=302)
+
+
+@app.post("/admin/keywords/{keyword_id}/delete")
+def admin_keywords_delete(
+    keyword_id: int, request: Request, db: Session = Depends(get_db)
+):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+
+    kw = db.query(Keyword).filter(Keyword.id == keyword_id).first()
+    if kw:
+        db.delete(kw)
+        db.commit()
+    return RedirectResponse("/admin/keywords", status_code=302)
+
+
+# ─── Admin: RSS zdroje ─────────────────────────────────────────────────────────
+
+@app.get("/admin/sources", response_class=HTMLResponse)
+def admin_sources(request: Request, db: Session = Depends(get_db)):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+
+    sources = db.query(NewsSource).order_by(NewsSource.language, NewsSource.name).all()
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "sources": sources,
+        "active_tab": "sources",
+    })
+
+
+@app.post("/admin/sources/{source_id}/toggle")
+def admin_sources_toggle(
+    source_id: int, request: Request, db: Session = Depends(get_db)
+):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+
+    source = db.query(NewsSource).filter(NewsSource.id == source_id).first()
+    if source:
+        source.enabled = not source.enabled
+        db.commit()
+    return RedirectResponse("/admin/sources", status_code=302)
+
+
+@app.post("/admin/sources/add")
+def admin_sources_add(
+    request: Request,
+    name: str = Form(...),
+    url: str = Form(...),
+    language: str = Form("cs"),
+    db: Session = Depends(get_db),
+):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+
+    db.add(NewsSource(name=name.strip(), url=url.strip(), language=language))
+    db.commit()
+    return RedirectResponse("/admin/sources", status_code=302)
+
+
+# ─── Admin: live status scrape ────────────────────────────────────────────────
+
+@app.get("/admin/scrape-status")
+def scrape_status(request: Request):
+    if not is_authenticated(request):
+        raise HTTPException(status_code=401)
+    return JSONResponse(get_status())
+
+
+@app.post("/admin/settings/interval")
+def admin_set_interval(request: Request, hours: float = Form(...)):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+    hours = max(0.5, min(24.0, hours))
+    set_interval(hours)
+    return RedirectResponse("/admin?saved=1", status_code=302)
+
+
+@app.post("/admin/settings/min-score")
+def admin_set_min_score(request: Request, score: float = Form(...)):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+    score = max(1.0, min(10.0, score))
+    set_min_score(score)
+    return RedirectResponse("/admin?saved=1", status_code=302)
+
+
+# ─── Admin: manuální spuštění ─────────────────────────────────────────────────
+
+@app.post("/admin/trigger")
+def admin_trigger(request: Request):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+
+    import threading
+    t = threading.Thread(target=trigger_manual, daemon=True)
+    t.start()
+    return RedirectResponse("/admin?triggered=1", status_code=302)
+
+
+# ─── Admin: přehled článků ────────────────────────────────────────────────────
+
+@app.get("/admin/articles", response_class=HTMLResponse)
+def admin_articles(request: Request, db: Session = Depends(get_db)):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+
+    articles = db.query(Article).order_by(Article.created_at.desc()).limit(100).all()
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "all_articles": articles,
+        "active_tab": "articles",
+    })
+
+
+# ─── Admin: statistiky ────────────────────────────────────────────────────────
+
+@app.get("/admin/stats", response_class=HTMLResponse)
+def admin_stats(
+    request: Request,
+    db: Session = Depends(get_db),
+    page: int = 1,
+    sort: str = "date",
+    dir: str = "desc",
+):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+
+    PER_PAGE = 20
+
+    all_articles = db.query(Article).all()
+    stats = []
+    for a in all_articles:
+        views = db.query(ArticleView).filter(
+            ArticleView.article_id == a.id, ArticleView.view_type == "open"
+        ).count()
+        clicks = db.query(ArticleView).filter(
+            ArticleView.article_id == a.id, ArticleView.view_type == "click"
+        ).count()
+        ratings = db.query(ArticleRating).filter(ArticleRating.article_id == a.id).all()
+        avg_r = round(sum(r.rating for r in ratings) / len(ratings), 1) if ratings else None
+        comments_count = db.query(Comment).filter(Comment.article_id == a.id).count()
+        stats.append({
+            "article": a,
+            "views": views,
+            "clicks": clicks,
+            "rating_count": len(ratings),
+            "avg_rating": avg_r,
+            "comments": comments_count,
+        })
+
+    # Řazení
+    sort_keys = {
+        "title":    lambda r: r["article"].title.lower(),
+        "views":    lambda r: r["views"],
+        "clicks":   lambda r: r["clicks"],
+        "rating":   lambda r: r["avg_rating"] or 0,
+        "comments": lambda r: r["comments"],
+        "date":     lambda r: r["article"].created_at or datetime.min,
+    }
+    key_fn = sort_keys.get(sort, sort_keys["date"])
+    stats.sort(key=key_fn, reverse=(dir == "desc"))
+
+    # Stránkování
+    total = len(stats)
+    total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+    page = max(1, min(page, total_pages))
+    page_stats = stats[(page - 1) * PER_PAGE: page * PER_PAGE]
+
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "stats": page_stats,
+        "active_tab": "stats",
+        "stats_page": page,
+        "stats_total_pages": total_pages,
+        "stats_total": total,
+        "stats_sort": sort,
+        "stats_dir": dir,
+    })
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)

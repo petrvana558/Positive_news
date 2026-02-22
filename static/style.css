@@ -1,0 +1,77 @@
+/* Pozitivní zprávy – custom styles */
+
+/* Score badge – modrá */
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #DBEAFE, #BFDBFE);
+  color: #1E40AF;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  border: 1px solid #93C5FD;
+}
+
+/* Article content prose */
+.prose-custom p {
+  margin-bottom: 1.25rem;
+  line-height: 1.8;
+  font-size: 1.05rem;
+  color: #374151;
+}
+
+/* Smooth image hover */
+img {
+  transition: transform 0.4s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #EFF6FF;
+}
+::-webkit-scrollbar-thumb {
+  background: #93C5FD;
+  border-radius: 3px;
+}
+
+/* Hide scrollbar for nav */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Line clamp utility */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Fade-in animation for articles */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+article {
+  animation: fadeInUp 0.4s ease both;
+}
+article:nth-child(2) { animation-delay: 0.06s; }
+article:nth-child(3) { animation-delay: 0.12s; }
+article:nth-child(4) { animation-delay: 0.18s; }
+article:nth-child(5) { animation-delay: 0.24s; }
+article:nth-child(6) { animation-delay: 0.30s; }

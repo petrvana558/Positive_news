@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title or "Archiv článků" }} – Pozitivní zprávy{% endblock %}
+
+{% block content %}
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-800 mb-2">{{ page_title or "Archiv článků 📚" }}</h1>
+    <p class="text-gray-500">{{ page_subtitle or "Všechny doposud vygenerované pozitivní zprávy" }}</p>
+  </div>
+
+  {% if articles %}
+    <div class="space-y-4">
+      {% for article in articles %}
+        <a href="/clanek/{{ article.id }}"
+           class="flex gap-5 bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow group">
+          {% if article.image_url %}
+            <img src="{{ article.image_url }}" alt="{{ article.image_alt }}"
+                 class="w-24 h-24 object-cover rounded-lg flex-shrink-0" />
+          {% endif %}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="score-badge text-xs">⭐ {{ "%.1f"|format(article.positivity_score) }}</span>
+              <span class="text-xs text-gray-400">{{ article.source_name }}</span>
+              {% if article.is_published %}
+                <span class="text-xs bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full">Aktuální</span>
+              {% endif %}
+            </div>
+            <h2 class="font-semibold text-gray-800 group-hover:text-amber-500 transition-colors line-clamp-2">
+              {{ article.title }}
+            </h2>
+            <p class="text-xs text-gray-400 mt-1">
+              {{ article.created_at.strftime('%d. %m. %Y %H:%M') if article.created_at else '' }}
+            </p>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-center py-16 text-gray-400">
+      <div class="text-5xl mb-4">📭</div>
+      <p>Zatím žádné články v této kategorii</p>
+    </div>
+  {% endif %}
+{% endblock %}
