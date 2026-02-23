@@ -4,10 +4,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends, Form, Request, HTTPException
+from fastapi import FastAPI, Depends, Form, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 load_dotenv()
@@ -158,6 +159,7 @@ CATEGORY_NAMES = {
     "zahranici": "Zahraničí",
     "sport": "Sport",
     "zviratka": "Zvířátka",
+    "veda": "Věda a technika",
     "ostatni": "Ostatní",
 }
 
@@ -167,6 +169,7 @@ CATEGORY_ICONS = {
     "zahranici": "🌍",
     "sport": "⚽",
     "zviratka": "🐾",
+    "veda": "🧪",
     "ostatni": "🔬",
 }
 
@@ -520,6 +523,67 @@ def admin_stats(
         "total_clicks": total_clicks,
         "unique_ips": unique_ips,
         "recent_visits": recent_visits,
+    })
+
+
+# ─── Admin: návštěvnost / IP log ──────────────────────────────────────────────
+
+@app.get("/admin/visitors", response_class=HTMLResponse)
+def admin_visitors(
+    request: Request,
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1),
+):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+
+    PER_PAGE = 50
+
+    # Přehled unikátních IP s počtem návštěv
+    ip_stats = (
+        db.query(
+            SiteVisit.ip_address,
+            func.count(SiteVisit.id).label("visits"),
+            func.min(SiteVisit.visited_at).label("first_seen"),
+            func.max(SiteVisit.visited_at).label("last_seen"),
+        )
+        .group_by(SiteVisit.ip_address)
+        .order_by(func.count(SiteVisit.id).desc())
+        .all()
+    )
+
+    # Raw log – stránkovaný
+    total_log = db.query(SiteVisit).count()
+    total_pages = max(1, (total_log + PER_PAGE - 1) // PER_PAGE)
+    page = max(1, min(page, total_pages))
+    visit_log = (
+        db.query(SiteVisit)
+        .order_by(SiteVisit.visited_at.desc())
+        .offset((page - 1) * PER_PAGE)
+        .limit(PER_PAGE)
+        .all()
+    )
+
+    today = datetime.utcnow().date()
+    visits_today = db.query(SiteVisit).filter(
+        SiteVisit.visited_at >= datetime(today.year, today.month, today.day)
+    ).count()
+    visits_7d = db.query(SiteVisit).filter(
+        SiteVisit.visited_at >= datetime.utcnow() - timedelta(days=7)
+    ).count()
+
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "active_tab": "visitors",
+        "ip_stats": ip_stats,
+        "visit_log": visit_log,
+        "visit_log_page": page,
+        "visit_log_total_pages": total_pages,
+        "visit_log_total": total_log,
+        "unique_ips_count": len(ip_stats),
+        "visits_today": visits_today,
+        "visits_7d": visits_7d,
+        "total_visits": total_log,
     })
 
 

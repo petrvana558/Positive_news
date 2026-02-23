@@ -39,6 +39,7 @@
           ('sources', '📡', 'RSS zdroje', '/admin/sources'),
           ('articles', '📰', 'Články', '/admin/articles'),
           ('stats', '📈', 'Statistiky', '/admin/stats'),
+          ('visitors', '🖥️', 'Návštěvnost', '/admin/visitors'),
         ] %}
         {% for tab_id, icon, label, href in tabs %}
           <a href="{{ href }}"
@@ -610,6 +611,107 @@
               {% endfor %}
             </tbody>
           </table>
+        </div>
+
+      {% elif active_tab == 'visitors' %}
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-2xl font-bold text-gray-800">Návštěvnost</h1>
+          <span class="text-sm text-gray-400">{{ visit_log_total }} záznamů</span>
+        </div>
+
+        <!-- KPI -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {% for value, label, color, icon in [
+            (total_visits,       'Návštěv celkem',   'teal',   '🌐'),
+            (unique_ips_count,   'Unikátních IP',    'violet', '🖥️'),
+            (visits_today,       'Návštěv dnes',     'rose',   '📅'),
+            (visits_7d,          'Návštěv 7 dní',    'orange', '📆'),
+          ] %}
+            <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div class="text-2xl mb-1">{{ icon }}</div>
+              <div class="text-2xl font-bold text-{{ color }}-500">{{ value }}</div>
+              <div class="text-xs text-gray-500 mt-1">{{ label }}</div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <!-- Unikátní IP adresy -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+          <div class="px-5 py-4 border-b border-gray-100">
+            <h2 class="font-semibold text-gray-700">Unikátní IP adresy</h2>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-gray-500 font-medium">IP adresa</th>
+                <th class="px-4 py-3 text-center text-gray-500 font-medium">Návštěv</th>
+                <th class="px-4 py-3 text-left text-gray-500 font-medium">První návštěva</th>
+                <th class="px-4 py-3 text-left text-gray-500 font-medium">Poslední návštěva</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              {% for row in ip_stats %}
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-2.5 font-mono text-sm text-gray-800">{{ row.ip_address or '—' }}</td>
+                  <td class="px-4 py-2.5 text-center font-bold text-teal-600">{{ row.visits }}</td>
+                  <td class="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap">
+                    {{ row.first_seen.strftime('%d.%m.%Y %H:%M') if row.first_seen else '—' }}
+                  </td>
+                  <td class="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap">
+                    {{ row.last_seen.strftime('%d.%m.%Y %H:%M') if row.last_seen else '—' }}
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="4" class="px-4 py-6 text-center text-gray-400">Zatím žádné návštěvy</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Raw log -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="font-semibold text-gray-700">Log návštěv</h2>
+            <span class="text-xs text-gray-400">strana {{ visit_log_page }} / {{ visit_log_total_pages }}</span>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-gray-500 font-medium">IP adresa</th>
+                <th class="px-4 py-3 text-left text-gray-500 font-medium">Stránka</th>
+                <th class="px-4 py-3 text-left text-gray-500 font-medium">Čas</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              {% for v in visit_log %}
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-2 font-mono text-xs text-gray-700">{{ v.ip_address or '—' }}</td>
+                  <td class="px-4 py-2 text-gray-500 text-xs">{{ v.path }}</td>
+                  <td class="px-4 py-2 text-gray-400 text-xs whitespace-nowrap">
+                    {{ v.visited_at.strftime('%d.%m.%Y %H:%M:%S') if v.visited_at else '' }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          {% if visit_log_total_pages > 1 %}
+            <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between text-sm">
+              <span class="text-gray-400">{{ visit_log_total }} záznamů celkem</span>
+              <div class="flex gap-1">
+                {% if visit_log_page > 1 %}
+                  <a href="/admin/visitors?page={{ visit_log_page - 1 }}"
+                     class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-100 text-gray-600">← Předchozí</a>
+                {% endif %}
+                {% if visit_log_page < visit_log_total_pages %}
+                  <a href="/admin/visitors?page={{ visit_log_page + 1 }}"
+                     class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-100 text-gray-600">Další →</a>
+                {% endif %}
+              </div>
+            </div>
+          {% endif %}
         </div>
 
       {% endif %}

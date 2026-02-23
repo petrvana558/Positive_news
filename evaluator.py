@@ -57,13 +57,14 @@ def evaluate_article(article: dict, keywords: list) -> dict:
 8-9: Pozitivní, inspirující
 10: Velmi pozitivní, výjimečně povzbuzující
 
-Kategorie musí být přesně jedna z: ekonomika, domaci, zahranici, sport, zviratka, ostatni
-- ekonomika: finance, byznys, trhy, firmy, technologie
+Kategorie musí být přesně jedna z: ekonomika, domaci, zahranici, sport, zviratka, veda, ostatni
+- ekonomika: finance, byznys, trhy, firmy, startupy, průmysl
 - domaci: česká politika, české události, česká společnost
 - zahranici: zahraniční politika, světové události, mezinárodní dění
 - sport: všechny sporty, olympiáda, mistrovství
 - zviratka: zvířata, příroda, záchrana zvířat, mazlíčci, divoká příroda, ekologie
-- ostatni: věda, kultura, životní styl, zdraví
+- veda: věda, výzkum, technologie, vesmír, AI, medicína, inovace, objevy
+- ostatni: kultura, životní styl, zdraví, cestování
 
 Odpovídej VŽDY pouze validním JSON objektem v tomto formátu:
 {"score": 7.5, "reason": "Krátké vysvětlení v češtině", "extracted_keywords": ["slovo1", "slovo2"], "category": "zahranici"}"""

@@ -223,6 +223,13 @@
             </a>
           </li>
           <li>
+            <a href="/kategorie/veda"
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap rounded-t-lg transition-colors
+                      {% if '/kategorie/veda' in request.url.path %}text-white bg-amber-500{% else %}text-gray-600 hover:text-amber-600 hover:bg-amber-100{% endif %}">
+              🧪 Věda
+            </a>
+          </li>
+          <li>
             <a href="/archiv"
                class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-t-lg transition-colors
                       {% if request.url.path == '/archiv' %}text-white bg-gray-400{% else %}text-gray-400 hover:text-gray-600 hover:bg-gray-100{% endif %}">
