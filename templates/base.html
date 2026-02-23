@@ -12,6 +12,11 @@
       50%  { transform: rotate(25deg); }
       100% { transform: rotate(-25deg); }
     }
+    @keyframes wag-fast {
+      0%   { transform: rotate(-40deg); }
+      50%  { transform: rotate(40deg); }
+      100% { transform: rotate(-40deg); }
+    }
     @keyframes blink {
       0%, 90%, 100% { transform: scaleY(1); }
       95%           { transform: scaleY(0.1); }
@@ -24,10 +29,24 @@
       0%, 100% { transform: translateY(0px); }
       50%      { transform: translateY(-4px); }
     }
-    .tail-wag  { transform-origin: 18px 60px; animation: wag 0.55s ease-in-out infinite; }
-    .eye-blink { transform-origin: center center; animation: blink 3.5s ease-in-out infinite; }
-    .dog-float { animation: float 3s ease-in-out infinite; }
-    .speech-pop { animation: bubble-in 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+    @keyframes bark-pop {
+      0%   { opacity:0; transform: scale(0.1) rotate(-15deg); }
+      55%  { opacity:1; transform: scale(1.18) rotate(4deg); }
+      75%  { transform: scale(0.93) rotate(-2deg); }
+      100% { opacity:1; transform: scale(1) rotate(2deg); }
+    }
+    @keyframes bark-out {
+      0%   { opacity:1; transform: scale(1) rotate(2deg); }
+      100% { opacity:0; transform: scale(0.6) translateY(-8px) rotate(-5deg); }
+    }
+    .tail-wag    { transform-origin: 18px 60px; animation: wag 0.55s ease-in-out infinite; }
+    .tail-wag-fast { transform-origin: 18px 60px; animation: wag-fast 0.2s ease-in-out infinite; }
+    .eye-blink   { transform-origin: center center; animation: blink 3.5s ease-in-out infinite; }
+    .dog-float   { animation: float 3s ease-in-out infinite; }
+    .speech-pop  { animation: bubble-in 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+    #bark-bubble { transform-origin: 10% 90%; pointer-events:none; }
+    #bark-bubble.show { animation: bark-pop 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+    #bark-bubble.hide { animation: bark-out 0.35s ease-in forwards; }
   </style>
 </head>
 <body class="bg-[#FFFBF4] text-gray-800 min-h-screen flex flex-col">
@@ -40,7 +59,7 @@
       <div class="flex items-center justify-center gap-4 sm:gap-10">
 
         <!-- ── Psí maskot (schovaný na mobilech) ── -->
-        <div class="relative hidden sm:block flex-shrink-0" style="width:96px; height:100px;">
+        <div id="dog-wrap" class="relative hidden sm:block flex-shrink-0" style="width:96px; height:100px; cursor:pointer;">
 
           <!-- Bublina se štekem -->
           <div class="speech-pop absolute z-10 whitespace-nowrap"
@@ -54,12 +73,29 @@
             </div>
           </div>
 
+          <!-- Barková bublina (vyskočí z pusy při hover) -->
+          <div id="bark-bubble"
+               style="position:absolute; bottom:28px; right:-92px; opacity:0; z-index:20; white-space:nowrap;">
+            <div style="background:#FBBF24; border:3px solid #D97706; border-radius:10px;
+                        padding:5px 10px; font-weight:900; color:#78350F; font-size:0.8rem;
+                        transform:rotate(2deg); box-shadow:3px 3px 0 #D97706; position:relative;">
+              <span id="bark-text">HAF! HAF! 🐾</span>
+              <!-- šipka z bubliny doleva dolů (k puse) -->
+              <span style="position:absolute; bottom:-11px; left:14px; width:0; height:0;
+                           border-left:6px solid transparent; border-right:4px solid transparent;
+                           border-top:12px solid #FBBF24; z-index:1;"></span>
+              <span style="position:absolute; bottom:-14px; left:12px; width:0; height:0;
+                           border-left:7px solid transparent; border-right:5px solid transparent;
+                           border-top:14px solid #D97706;"></span>
+            </div>
+          </div>
+
           <!-- SVG Psík -->
           <svg class="dog-float" width="92" height="98" viewBox="0 0 120 130"
                fill="none" xmlns="http://www.w3.org/2000/svg">
 
-            <!-- Ocásek (mává) -->
-            <g class="tail-wag">
+            <!-- Ocásek (mává, při štěkání rychleji) -->
+            <g id="dog-tail" class="tail-wag">
               <path d="M 26 88 Q 6 72 10 52 Q 13 38 24 42"
                     stroke="#B5661E" stroke-width="9" fill="none" stroke-linecap="round"/>
             </g>
@@ -214,5 +250,65 @@
     </div>
   </footer>
 
+  <script>
+  (function() {
+    var COOLDOWN = 20000; // 20 sekund pauza
+    var lastBark = 0;
+    var barkTimer = null;
+
+    var phrases = [
+      'HAF! HAF! 🐾',
+      'Woof! Woof! 🗞️',
+      'ŠTĚKÁM! 📰',
+      'Haf haf haf! 🌟',
+      'WÚF WÚF! 🎉',
+      'Jen dobré zprávy! 🐕',
+      'Čtu zprávy! 📖',
+      'DOBRÝ DEN! 🌞',
+      'HAF! Radostné zprávy! 🎊',
+    ];
+
+    var wrap   = document.getElementById('dog-wrap');
+    var bubble = document.getElementById('bark-bubble');
+    var text   = document.getElementById('bark-text');
+    var tail   = document.getElementById('dog-tail');
+
+    if (!wrap || !bubble) return;
+
+    wrap.addEventListener('mouseenter', function() {
+      var now = Date.now();
+      if (now - lastBark < COOLDOWN) return;
+      lastBark = now;
+
+      // Náhodná fráze
+      text.textContent = phrases[Math.floor(Math.random() * phrases.length)];
+
+      // Rychlejší ocásek při štěkání
+      tail.classList.remove('tail-wag');
+      tail.classList.add('tail-wag-fast');
+
+      // Zobraz bublinu
+      bubble.classList.remove('hide');
+      bubble.style.opacity = '1';
+      void bubble.offsetWidth; // reflow pro restart animace
+      bubble.classList.add('show');
+
+      if (barkTimer) clearTimeout(barkTimer);
+      barkTimer = setTimeout(function() {
+        // Skryj bublinu
+        bubble.classList.remove('show');
+        bubble.classList.add('hide');
+        // Vrať normální ocásek
+        tail.classList.remove('tail-wag-fast');
+        tail.classList.add('tail-wag');
+        // Po animaci schování vynuluj opacity
+        setTimeout(function() {
+          bubble.style.opacity = '0';
+          bubble.classList.remove('hide');
+        }, 380);
+      }, 2400);
+    });
+  })();
+  </script>
 </body>
 </html>
