@@ -1,7 +1,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, Form, Request, HTTPException
@@ -12,12 +12,18 @@ from sqlalchemy.orm import Session
 
 load_dotenv()
 
-from database import get_db, init_db, Article, Keyword, NewsSource, Comment, ArticleRating, ArticleView
+from database import get_db, init_db, Article, Keyword, NewsSource, Comment, ArticleRating, ArticleView, SiteVisit
 from auth import (
     SESSION_COOKIE, create_session_token, is_authenticated,
     require_auth, verify_admin_password
 )
-from scheduler import start_scheduler, stop_scheduler, trigger_manual, get_status, set_interval, get_interval, get_min_score, set_min_score
+from scheduler import (
+    start_scheduler, stop_scheduler, trigger_manual, get_status,
+    set_interval, get_interval, get_min_score, set_min_score,
+    get_max_articles, set_max_articles,
+)
+
+ARCHIVE_DAYS = 14
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,11 +49,16 @@ templates = Jinja2Templates(directory="templates")
 
 @app.get("/", response_class=HTMLResponse)
 def homepage(request: Request, db: Session = Depends(get_db)):
+    # Zaznamenat návštěvu
+    db.add(SiteVisit(path="/"))
+    db.commit()
+
+    cutoff = datetime.utcnow() - timedelta(days=ARCHIVE_DAYS)
     articles = (
         db.query(Article)
-        .filter(Article.is_published == True)
+        .filter(Article.is_published == True, Article.created_at >= cutoff)
         .order_by(Article.positivity_score.desc())
-        .limit(12)
+        .limit(24)
         .all()
     )
     return templates.TemplateResponse("index.html", {"request": request, "articles": articles})
@@ -138,7 +149,17 @@ CATEGORY_NAMES = {
     "domaci": "Domácí",
     "zahranici": "Zahraničí",
     "sport": "Sport",
+    "zviratka": "Zvířátka",
     "ostatni": "Ostatní",
+}
+
+CATEGORY_ICONS = {
+    "ekonomika": "💼",
+    "domaci": "🏠",
+    "zahranici": "🌍",
+    "sport": "⚽",
+    "zviratka": "🐾",
+    "ostatni": "🔬",
 }
 
 
@@ -146,18 +167,24 @@ CATEGORY_NAMES = {
 def category_page(category: str, request: Request, db: Session = Depends(get_db)):
     if category not in CATEGORY_NAMES:
         raise HTTPException(status_code=404, detail="Kategorie nenalezena")
+    # Zaznamenat návštěvu
+    db.add(SiteVisit(path=f"/kategorie/{category}"))
+    db.commit()
+
+    cutoff = datetime.utcnow() - timedelta(days=ARCHIVE_DAYS)
     articles = (
         db.query(Article)
-        .filter(Article.category == category)
+        .filter(Article.is_published == True, Article.category == category, Article.created_at >= cutoff)
         .order_by(Article.created_at.desc())
         .limit(50)
         .all()
     )
+    icon = CATEGORY_ICONS.get(category, "📰")
     return templates.TemplateResponse("archive.html", {
         "request": request,
         "articles": articles,
-        "page_title": f"{CATEGORY_NAMES[category]} 📰",
-        "page_subtitle": f"Pozitivní zprávy v kategorii {CATEGORY_NAMES[category]}",
+        "page_title": f"{icon} {CATEGORY_NAMES[category]}",
+        "page_subtitle": f"Pozitivní zprávy v kategorii {CATEGORY_NAMES[category]} – posledních {ARCHIVE_DAYS} dní",
     })
 
 
@@ -211,6 +238,12 @@ def admin_panel(request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
+    total_visits = db.query(SiteVisit).count()
+    today = datetime.utcnow().date()
+    visits_today = db.query(SiteVisit).filter(
+        SiteVisit.visited_at >= datetime(today.year, today.month, today.day)
+    ).count()
+
     return templates.TemplateResponse("admin.html", {
         "request": request,
         "articles_count": articles_count,
@@ -220,6 +253,9 @@ def admin_panel(request: Request, db: Session = Depends(get_db)):
         "recent_articles": recent,
         "scrape_interval": get_interval(),
         "min_score": get_min_score(),
+        "max_articles": get_max_articles(),
+        "total_visits": total_visits,
+        "visits_today": visits_today,
         "active_tab": "dashboard",
     })
 
@@ -350,6 +386,14 @@ def admin_set_min_score(request: Request, score: float = Form(...)):
     return RedirectResponse("/admin?saved=1", status_code=302)
 
 
+@app.post("/admin/settings/max-articles")
+def admin_set_max_articles(request: Request, n: int = Form(...)):
+    if not is_authenticated(request):
+        return RedirectResponse("/admin/login", status_code=302)
+    set_max_articles(n)
+    return RedirectResponse("/admin?saved=1", status_code=302)
+
+
 # ─── Admin: manuální spuštění ─────────────────────────────────────────────────
 
 @app.post("/admin/trigger")
@@ -432,6 +476,18 @@ def admin_stats(
     page = max(1, min(page, total_pages))
     page_stats = stats[(page - 1) * PER_PAGE: page * PER_PAGE]
 
+    # Celková návštěvnost
+    total_site_visits = db.query(SiteVisit).count()
+    today = datetime.utcnow().date()
+    visits_today = db.query(SiteVisit).filter(
+        SiteVisit.visited_at >= datetime(today.year, today.month, today.day)
+    ).count()
+    visits_7d = db.query(SiteVisit).filter(
+        SiteVisit.visited_at >= datetime.utcnow() - timedelta(days=7)
+    ).count()
+    total_article_views = db.query(ArticleView).filter(ArticleView.view_type == "open").count()
+    total_clicks = db.query(ArticleView).filter(ArticleView.view_type == "click").count()
+
     return templates.TemplateResponse("admin.html", {
         "request": request,
         "stats": page_stats,
@@ -441,6 +497,11 @@ def admin_stats(
         "stats_total": total,
         "stats_sort": sort,
         "stats_dir": dir,
+        "total_site_visits": total_site_visits,
+        "visits_today": visits_today,
+        "visits_7d": visits_7d,
+        "total_article_views": total_article_views,
+        "total_clicks": total_clicks,
     })
 
 

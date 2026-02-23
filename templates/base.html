@@ -88,6 +88,17 @@
             </a>
           </li>
           <li>
+            <a href="/kategorie/zviratka"
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
+                      {% if '/kategorie/zviratka' in request.url.path %}
+                        text-white bg-blue-500 rounded-t-lg
+                      {% else %}
+                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
+                      {% endif %}">
+              🐾 Zvířátka
+            </a>
+          </li>
+          <li>
             <a href="/archiv"
                class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap
                       {% if request.url.path == '/archiv' %}

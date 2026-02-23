@@ -85,6 +85,14 @@ class ArticleView(Base):
     viewed_at = Column(DateTime, default=datetime.utcnow)
 
 
+class SiteVisit(Base):
+    __tablename__ = "site_visits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    path = Column(String(200), default="/")
+    visited_at = Column(DateTime, default=datetime.utcnow)
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -119,40 +127,87 @@ def _seed_defaults(db):
         if url not in existing_urls:
             db.add(NewsSource(name=name, url=url, language=lang))
 
-    # Výchozí klíčová slova
-    if db.query(Keyword).count() == 0:
-        keywords = [
-            # Pozitivní
-            Keyword(word="úspěch", weight=1.5, keyword_type="positive"),
-            Keyword(word="radost", weight=1.5, keyword_type="positive"),
-            Keyword(word="naděje", weight=1.2, keyword_type="positive"),
-            Keyword(word="pomoc", weight=1.2, keyword_type="positive"),
-            Keyword(word="láska", weight=1.5, keyword_type="positive"),
-            Keyword(word="vítězství", weight=1.3, keyword_type="positive"),
-            Keyword(word="přátelství", weight=1.2, keyword_type="positive"),
-            Keyword(word="inovace", weight=1.0, keyword_type="positive"),
-            Keyword(word="zdraví", weight=1.0, keyword_type="positive"),
-            Keyword(word="pozitivní", weight=1.0, keyword_type="positive"),
-            Keyword(word="rekord", weight=0.8, keyword_type="positive"),
-            Keyword(word="zlepšení", weight=0.8, keyword_type="positive"),
-            Keyword(word="success", weight=1.5, keyword_type="positive"),
-            Keyword(word="hope", weight=1.2, keyword_type="positive"),
-            Keyword(word="joy", weight=1.5, keyword_type="positive"),
-            Keyword(word="breakthrough", weight=1.3, keyword_type="positive"),
-            Keyword(word="inspire", weight=1.2, keyword_type="positive"),
-            # Negativní
-            Keyword(word="smrt", weight=-2.0, keyword_type="negative"),
-            Keyword(word="tragédie", weight=-2.0, keyword_type="negative"),
-            Keyword(word="válka", weight=-2.0, keyword_type="negative"),
-            Keyword(word="krize", weight=-1.5, keyword_type="negative"),
-            Keyword(word="katastrofa", weight=-2.0, keyword_type="negative"),
-            Keyword(word="útok", weight=-1.8, keyword_type="negative"),
-            Keyword(word="nehoda", weight=-1.5, keyword_type="negative"),
-            Keyword(word="war", weight=-2.0, keyword_type="negative"),
-            Keyword(word="disaster", weight=-2.0, keyword_type="negative"),
-            Keyword(word="crisis", weight=-1.5, keyword_type="negative"),
-            Keyword(word="attack", weight=-1.8, keyword_type="negative"),
-        ]
-        db.add_all(keywords)
+    # Výchozí klíčová slova – přidá chybějící (funguje i pro existující DB)
+    default_keywords = [
+        # Pozitivní – česky
+        ("úspěch", 1.5, "positive"),
+        ("radost", 1.5, "positive"),
+        ("naděje", 1.2, "positive"),
+        ("pomoc", 1.2, "positive"),
+        ("láska", 1.5, "positive"),
+        ("vítězství", 1.3, "positive"),
+        ("přátelství", 1.2, "positive"),
+        ("inovace", 1.0, "positive"),
+        ("zdraví", 1.0, "positive"),
+        ("pozitivní", 1.0, "positive"),
+        ("rekord", 0.8, "positive"),
+        ("zlepšení", 0.8, "positive"),
+        ("objev", 1.2, "positive"),
+        ("průlom", 1.3, "positive"),
+        ("záchrana", 1.3, "positive"),
+        ("ochrana", 1.0, "positive"),
+        ("solidarita", 1.2, "positive"),
+        ("dobročinnost", 1.3, "positive"),
+        ("inspirace", 1.2, "positive"),
+        ("odvaha", 1.1, "positive"),
+        ("rozvoj", 0.9, "positive"),
+        ("obnova", 0.9, "positive"),
+        ("mír", 1.4, "positive"),
+        ("harmonie", 1.0, "positive"),
+        ("štěstí", 1.4, "positive"),
+        ("prosperita", 1.0, "positive"),
+        ("sbírka", 0.9, "positive"),
+        ("dobrovolníci", 1.2, "positive"),
+        ("ocenění", 0.9, "positive"),
+        ("uzdravení", 1.3, "positive"),
+        ("příroda", 0.8, "positive"),
+        ("zvíře", 0.8, "positive"),
+        ("mazlíček", 0.9, "positive"),
+        # Pozitivní – anglicky
+        ("success", 1.5, "positive"),
+        ("hope", 1.2, "positive"),
+        ("joy", 1.5, "positive"),
+        ("breakthrough", 1.3, "positive"),
+        ("inspire", 1.2, "positive"),
+        ("rescue", 1.3, "positive"),
+        ("recovery", 1.1, "positive"),
+        ("celebrate", 1.1, "positive"),
+        ("achieve", 1.0, "positive"),
+        ("discover", 1.1, "positive"),
+        ("peace", 1.4, "positive"),
+        ("miracle", 1.3, "positive"),
+        ("volunteer", 1.2, "positive"),
+        ("charity", 1.1, "positive"),
+        ("award", 0.9, "positive"),
+        ("protect", 1.0, "positive"),
+        ("animal", 0.8, "positive"),
+        ("wildlife", 0.9, "positive"),
+        # Negativní – česky
+        ("smrt", -2.0, "negative"),
+        ("tragédie", -2.0, "negative"),
+        ("válka", -2.0, "negative"),
+        ("krize", -1.5, "negative"),
+        ("katastrofa", -2.0, "negative"),
+        ("útok", -1.8, "negative"),
+        ("nehoda", -1.5, "negative"),
+        ("teror", -2.0, "negative"),
+        ("vražda", -2.0, "negative"),
+        ("zkáza", -1.8, "negative"),
+        ("korupce", -1.5, "negative"),
+        ("podvod", -1.5, "negative"),
+        # Negativní – anglicky
+        ("war", -2.0, "negative"),
+        ("disaster", -2.0, "negative"),
+        ("crisis", -1.5, "negative"),
+        ("attack", -1.8, "negative"),
+        ("terror", -2.0, "negative"),
+        ("murder", -2.0, "negative"),
+        ("fraud", -1.5, "negative"),
+        ("corruption", -1.5, "negative"),
+    ]
+    existing_words = {kw.word for kw in db.query(Keyword).all()}
+    for word, weight, ktype in default_keywords:
+        if word not in existing_words:
+            db.add(Keyword(word=word, weight=abs(weight), keyword_type=ktype))
 
     db.commit()

@@ -81,6 +81,14 @@ def set_min_score(score: float):
     _save_setting("min_publish_score", str(round(score, 1)))
 
 
+def get_max_articles() -> int:
+    return int(_get_setting("max_articles_per_run", "6"))
+
+
+def set_max_articles(n: int):
+    _save_setting("max_articles_per_run", str(max(1, min(12, n))))
+
+
 # ─── Hlavní job ───────────────────────────────────────────────────────────────
 
 def run_scrape_job():
@@ -136,12 +144,13 @@ def run_scrape_job():
 
         ranked = evaluate_batch(new_articles, keywords, progress_cb=_progress_cb)
 
-        # 4. Filtrovat dle minimálního skóre, max 6 článků
+        # 4. Filtrovat dle minimálního skóre, max dle nastavení
         min_score = get_min_score()
+        max_n = get_max_articles()
         eligible = [a for a in ranked if a["positivity_score"] >= min_score]
-        top6 = eligible[:6]
+        top_articles = eligible[:max_n]
 
-        if not top6:
+        if not top_articles:
             msg = f"Žádný článek nedosáhl min. skóre {min_score:.1f} (max bylo {ranked[0]['positivity_score']:.1f})"
             logger.warning(msg)
             _set("done", msg)
@@ -150,14 +159,11 @@ def run_scrape_job():
             _status["last_run_result"] = msg
             return
 
-        logger.info(f"Top {len(top6)} článků (min. skóre {min_score}): {[a['title'][:40] for a in top6]}")
+        logger.info(f"Top {len(top_articles)} článků (min. skóre {min_score}): {[a['title'][:40] for a in top_articles]}")
 
-        # 5. Odznačit staré is_published
-        db.query(Article).filter(Article.is_published == True).update({"is_published": False})
-
-        # 6. Generovat nové články
-        for i, raw in enumerate(top6, 1):
-            _set("generating", f"Generuji článek {i}/{len(top6)}: {raw['title'][:45]}…")
+        # 5. Generovat nové články (staré zůstávají, archivují se automaticky po 14 dnech)
+        for i, raw in enumerate(top_articles, 1):
+            _set("generating", f"Generuji článek {i}/{len(top_articles)}: {raw['title'][:45]}…")
             generated = generate_article(raw)
             image = find_image(generated["image_query"])
 
@@ -179,7 +185,7 @@ def run_scrape_job():
 
         db.commit()
 
-        result_msg = f"OK – přidáno {len(top6)} článků (min. skóre {min_score:.1f})"
+        result_msg = f"OK – přidáno {len(top_articles)} článků (min. skóre {min_score:.1f})"
         logger.info("Scrape job dokončen.")
         _set("done", result_msg)
         _status["last_run_at"] = datetime.now().strftime("%d.%m.%Y %H:%M:%S")

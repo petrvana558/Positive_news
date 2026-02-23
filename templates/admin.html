@@ -68,12 +68,14 @@
         <h1 class="text-2xl font-bold text-gray-800 mb-6">Dashboard</h1>
 
         <!-- Stats -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
           {% for value, label, color in [
             (articles_count, 'Celkem článků', 'amber'),
-            (published_count, 'Publikovaných', 'emerald'),
+            (published_count, 'Aktivních článků', 'emerald'),
             (keywords_count, 'Klíčových slov', 'blue'),
             (sources_count, 'Aktivních zdrojů', 'purple'),
+            (visits_today, 'Návštěv dnes', 'rose'),
+            (total_visits, 'Návštěv celkem', 'teal'),
           ] %}
             <div class="bg-white rounded-xl p-4 shadow-sm text-center">
               <div class="text-3xl font-bold text-{{ color }}-500">{{ value }}</div>
@@ -137,6 +139,16 @@
                      class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm w-16 focus:outline-none focus:ring-2 focus:ring-amber-400 text-center" />
               <button type="submit" class="text-xs text-amber-600 hover:text-amber-800 font-medium">Uložit</button>
             </form>
+            <!-- Max. článků per run -->
+            <form method="post" action="/admin/settings/max-articles" class="flex items-center gap-2">
+              <label class="text-sm text-gray-500 whitespace-nowrap" title="Kolik nejlepších článků se přidá při jednom scrapu">Max. článků/run:</label>
+              <select name="n" onchange="this.form.submit()"
+                      class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white">
+                {% for i in range(1, 13) %}
+                  <option value="{{ i }}" {% if max_articles == i %}selected{% endif %}>{{ i }}</option>
+                {% endfor %}
+              </select>
+            </form>
           </div>
 
           <!-- Jak se počítá skóre -->
@@ -146,8 +158,9 @@
               <p><strong>1. Claude Haiku</strong> ohodnotí titulek + perex na škále 1–10 (cena ~$0.001/článek)</p>
               <p><strong>2. Keyword boost</strong> ±0.3 × váha za každé klíčové slovo nalezené v textu (zdarma)</p>
               <p><strong>Výsledné skóre</strong> = Claude skóre + keyword boost, oříznuté na &lt;1, 10&gt;</p>
-              <p><strong>Pre-filtr:</strong> Claude ohodnotí jen top {{ 25 }} kandidátů (seřazených dle keyword boostu), zbytek dostane skóre 1–4 automaticky.</p>
-              <p><strong>Publikování:</strong> Z ohodnocených se vybere max 6 článků se skóre ≥ min. skóre a pro každý se zavolá Claude Sonnet (generování textu, cena ~$0.02/článek).</p>
+              <p><strong>Pre-filtr:</strong> Claude ohodnotí jen top 25 kandidátů (seřazených dle keyword boostu), zbytek dostane skóre 1–4 automaticky.</p>
+              <p><strong>Publikování:</strong> Z ohodnocených se vybere max {{ max_articles }} článků se skóre ≥ min. skóre a pro každý se zavolá Claude Sonnet (generování textu, cena ~$0.02/článek).</p>
+              <p><strong>Archiv:</strong> Články zůstávají v kategoriích 14 dní, poté se automaticky přesunou do archivu.</p>
             </div>
           </details>
         </div>
@@ -450,6 +463,23 @@
         <div class="flex items-center justify-between mb-6">
           <h1 class="text-2xl font-bold text-gray-800">Statistiky článků</h1>
           <span class="text-sm text-gray-400">{{ stats_total }} článků celkem</span>
+        </div>
+
+        <!-- Návštěvnostní KPI -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          {% for value, label, color, icon in [
+            (visits_today,        'Návštěv dnes',     'rose',    '📅'),
+            (visits_7d,           'Návštěv 7 dní',    'orange',  '📆'),
+            (total_site_visits,   'Návštěv celkem',   'teal',    '🌐'),
+            (total_article_views, 'Zobrazení článků', 'blue',    '👁'),
+            (total_clicks,        'Prokliky ven',     'emerald', '🔗'),
+          ] %}
+            <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div class="text-2xl mb-1">{{ icon }}</div>
+              <div class="text-2xl font-bold text-{{ color }}-500">{{ value }}</div>
+              <div class="text-xs text-gray-500 mt-1">{{ label }}</div>
+            </div>
+          {% endfor %}
         </div>
 
         {# Makro pro záhlaví s řazením #}
