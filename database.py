@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from sqlalchemy import (
-    create_engine, Column, Integer, String, Float, Boolean, DateTime, Text
+    create_engine, Column, Integer, String, Float, Boolean, DateTime, Text, text
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -90,6 +90,7 @@ class SiteVisit(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     path = Column(String(200), default="/")
+    ip_address = Column(String(100))
     visited_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -103,6 +104,13 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    # Migrate: přidat ip_address do site_visits pokud chybí (existující DB)
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE site_visits ADD COLUMN ip_address VARCHAR(100)"))
+            conn.commit()
+        except Exception:
+            pass  # sloupec už existuje
     db = SessionLocal()
     try:
         _seed_defaults(db)

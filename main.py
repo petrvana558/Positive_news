@@ -25,6 +25,14 @@ from scheduler import (
 
 ARCHIVE_DAYS = 14
 
+
+def _get_client_ip(request: Request) -> str:
+    """Extrahuje IP adresu klienta – kontroluje X-Forwarded-For (proxy/Railway)."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -50,7 +58,7 @@ templates = Jinja2Templates(directory="templates")
 @app.get("/", response_class=HTMLResponse)
 def homepage(request: Request, db: Session = Depends(get_db)):
     # Zaznamenat návštěvu
-    db.add(SiteVisit(path="/"))
+    db.add(SiteVisit(path="/", ip_address=_get_client_ip(request)))
     db.commit()
 
     cutoff = datetime.utcnow() - timedelta(days=ARCHIVE_DAYS)
@@ -168,7 +176,7 @@ def category_page(category: str, request: Request, db: Session = Depends(get_db)
     if category not in CATEGORY_NAMES:
         raise HTTPException(status_code=404, detail="Kategorie nenalezena")
     # Zaznamenat návštěvu
-    db.add(SiteVisit(path=f"/kategorie/{category}"))
+    db.add(SiteVisit(path=f"/kategorie/{category}", ip_address=_get_client_ip(request)))
     db.commit()
 
     cutoff = datetime.utcnow() - timedelta(days=ARCHIVE_DAYS)
@@ -488,6 +496,14 @@ def admin_stats(
     total_article_views = db.query(ArticleView).filter(ArticleView.view_type == "open").count()
     total_clicks = db.query(ArticleView).filter(ArticleView.view_type == "click").count()
 
+    unique_ips = db.query(SiteVisit.ip_address).distinct().count()
+    recent_visits = (
+        db.query(SiteVisit)
+        .order_by(SiteVisit.visited_at.desc())
+        .limit(30)
+        .all()
+    )
+
     return templates.TemplateResponse("admin.html", {
         "request": request,
         "stats": page_stats,
@@ -502,6 +518,8 @@ def admin_stats(
         "visits_7d": visits_7d,
         "total_article_views": total_article_views,
         "total_clicks": total_clicks,
+        "unique_ips": unique_ips,
+        "recent_visits": recent_visits,
     })
 
 
