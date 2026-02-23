@@ -6,106 +6,190 @@
   <title>{% block title %}Pozitivní zprávy{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    @keyframes wag {
+      0%   { transform: rotate(-25deg); }
+      50%  { transform: rotate(25deg); }
+      100% { transform: rotate(-25deg); }
+    }
+    @keyframes blink {
+      0%, 90%, 100% { transform: scaleY(1); }
+      95%           { transform: scaleY(0.1); }
+    }
+    @keyframes bubble-in {
+      0%   { opacity: 0; transform: scale(0.7) translateY(4px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50%      { transform: translateY(-4px); }
+    }
+    .tail-wag  { transform-origin: 18px 60px; animation: wag 0.55s ease-in-out infinite; }
+    .eye-blink { transform-origin: center center; animation: blink 3.5s ease-in-out infinite; }
+    .dog-float { animation: float 3s ease-in-out infinite; }
+    .speech-pop { animation: bubble-in 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+  </style>
 </head>
-<body class="bg-[#EFF6FF] text-gray-800 min-h-screen flex flex-col">
+<body class="bg-[#FFFBF4] text-gray-800 min-h-screen flex flex-col">
 
-  <!-- Header – sticky -->
-  <header class="bg-white shadow-sm border-b-2 border-blue-100 sticky top-0 z-50">
+  <!-- ═══ HEADER ═══ -->
+  <header class="sticky top-0 z-50 shadow-md border-b-2 border-amber-200"
+          style="background: linear-gradient(160deg, #FFF8E1 0%, #FFF3E0 40%, #FFF9F0 70%, #F0F7FF 100%);">
 
-    <!-- Logo – centrovaný -->
-    <div class="max-w-5xl mx-auto px-4 pt-6 pb-2 text-center">
-      <a href="/" class="inline-flex flex-col items-center gap-1 group">
-        <div class="flex items-center gap-3">
-          <span class="text-5xl">🌍</span>
-          <span class="text-3xl font-extrabold tracking-tight text-blue-600 group-hover:text-blue-700 transition-colors">
-            Pozitivní zprávy
-          </span>
-          <span class="text-5xl">✨</span>
+    <div class="max-w-5xl mx-auto px-4 pt-4 pb-1">
+      <div class="flex items-center justify-center gap-4 sm:gap-10">
+
+        <!-- ── Psí maskot (schovaný na mobilech) ── -->
+        <div class="relative hidden sm:block flex-shrink-0" style="width:96px; height:100px;">
+
+          <!-- Bublina se štekem -->
+          <div class="speech-pop absolute z-10 whitespace-nowrap"
+               style="top:-10px; left:54px;">
+            <div class="relative bg-amber-400 text-amber-900 font-bold px-3 py-1.5 rounded-2xl shadow-lg text-xs leading-snug"
+                 style="font-size:0.68rem;">
+              Woof! Jen dobré zprávy!&nbsp;🗞️
+              <!-- šipka doleva -->
+              <span class="absolute top-1/2 -translate-y-1/2 -left-2.5"
+                    style="width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-right:10px solid #FBBF24;"></span>
+            </div>
+          </div>
+
+          <!-- SVG Psík -->
+          <svg class="dog-float" width="92" height="98" viewBox="0 0 120 130"
+               fill="none" xmlns="http://www.w3.org/2000/svg">
+
+            <!-- Ocásek (mává) -->
+            <g class="tail-wag">
+              <path d="M 26 88 Q 6 72 10 52 Q 13 38 24 42"
+                    stroke="#B5661E" stroke-width="9" fill="none" stroke-linecap="round"/>
+            </g>
+
+            <!-- Tělo -->
+            <ellipse cx="60" cy="103" rx="33" ry="21" fill="#E8A87C"/>
+
+            <!-- Tlapky -->
+            <ellipse cx="43" cy="120" rx="12" ry="7" fill="#D4936A"/>
+            <ellipse cx="77" cy="120" rx="12" ry="7" fill="#D4936A"/>
+
+            <!-- Levé ucho (visící) -->
+            <ellipse cx="33" cy="43" rx="14" ry="21"
+                     fill="#C17A45" transform="rotate(-18, 33, 43)"/>
+            <ellipse cx="33" cy="45" rx="8" ry="14"
+                     fill="#FFCDB2" transform="rotate(-18, 33, 45)"/>
+
+            <!-- Pravé ucho (visící) -->
+            <ellipse cx="87" cy="43" rx="14" ry="21"
+                     fill="#C17A45" transform="rotate(18, 87, 43)"/>
+            <ellipse cx="87" cy="45" rx="8" ry="14"
+                     fill="#FFCDB2" transform="rotate(18, 87, 45)"/>
+
+            <!-- Hlava -->
+            <circle cx="60" cy="63" r="31" fill="#E8A87C"/>
+
+            <!-- Bělmo levé oko -->
+            <circle cx="48" cy="58" r="8" fill="white"/>
+            <!-- Bělmo pravé oko -->
+            <circle cx="72" cy="58" r="8" fill="white"/>
+
+            <!-- Zornice (blikají) -->
+            <g class="eye-blink">
+              <circle cx="49" cy="59" r="4.5" fill="#2D1B0E"/>
+              <circle cx="73" cy="59" r="4.5" fill="#2D1B0E"/>
+            </g>
+
+            <!-- Třpyt v oku -->
+            <circle cx="51" cy="56.5" r="1.8" fill="white"/>
+            <circle cx="75" cy="56.5" r="1.8" fill="white"/>
+
+            <!-- Nos -->
+            <ellipse cx="60" cy="71" rx="6.5" ry="4.5" fill="#2D1B0E"/>
+
+            <!-- Nosní dírky -->
+            <ellipse cx="57.5" cy="72.5" rx="1.2" ry="1" fill="#1a0f08"/>
+            <ellipse cx="62.5" cy="72.5" rx="1.2" ry="1" fill="#1a0f08"/>
+
+            <!-- Úsměv -->
+            <path d="M 49 78 Q 60 87 71 78"
+                  stroke="#2D1B0E" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+
+            <!-- Jazyk -->
+            <ellipse cx="60" cy="85" rx="8" ry="6.5" fill="#FF8FAB"/>
+            <line x1="60" y1="78" x2="60" y2="91.5"
+                  stroke="#E5607A" stroke-width="1.8"/>
+
+            <!-- Červenání na tvářích -->
+            <ellipse cx="39" cy="68" rx="7" ry="4.5" fill="#FFB3C6" opacity="0.45"/>
+            <ellipse cx="81" cy="68" rx="7" ry="4.5" fill="#FFB3C6" opacity="0.45"/>
+          </svg>
         </div>
-        <p class="text-sm text-blue-400 font-medium tracking-wide mt-0.5">
-          Pozitivní zprávy pro pozitivní den
-        </p>
-      </a>
+
+        <!-- ── Název webu ── -->
+        <a href="/" class="inline-flex flex-col items-center gap-1 group">
+          <div class="flex items-center gap-2">
+            <span class="text-4xl sm:text-5xl font-extrabold tracking-tight leading-none"
+                  style="background: linear-gradient(135deg,#F59E0B 0%,#EF4444 50%,#EC4899 100%);
+                         -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">
+              Pozitivní zprávy
+            </span>
+          </div>
+          <p class="text-sm text-amber-500 font-semibold tracking-wide mt-0.5">
+            🌞 Každý den vybíráme to nejlepší ze světa 🌞
+          </p>
+        </a>
+
+      </div>
     </div>
 
-    <!-- Category navigation -->
-    <nav class="border-t border-blue-100 bg-blue-50 mt-3">
+    <!-- Navigace kategorií -->
+    <nav class="border-t border-amber-100 mt-3" style="background:rgba(255,248,230,0.85);">
       <div class="max-w-5xl mx-auto px-4">
         <ul class="flex items-center gap-1 overflow-x-auto py-0 scrollbar-none justify-center">
           <li>
             <a href="/"
-               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
-                      {% if request.url.path == '/' %}
-                        text-white bg-blue-500 rounded-t-lg
-                      {% else %}
-                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
-                      {% endif %}">
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap rounded-t-lg transition-colors
+                      {% if request.url.path == '/' %}text-white bg-amber-500{% else %}text-gray-600 hover:text-amber-600 hover:bg-amber-100{% endif %}">
               🔥 Hot News
             </a>
           </li>
           <li>
             <a href="/kategorie/ekonomika"
-               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
-                      {% if '/kategorie/ekonomika' in request.url.path %}
-                        text-white bg-blue-500 rounded-t-lg
-                      {% else %}
-                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
-                      {% endif %}">
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap rounded-t-lg transition-colors
+                      {% if '/kategorie/ekonomika' in request.url.path %}text-white bg-amber-500{% else %}text-gray-600 hover:text-amber-600 hover:bg-amber-100{% endif %}">
               💼 Ekonomika
             </a>
           </li>
           <li>
             <a href="/kategorie/domaci"
-               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
-                      {% if '/kategorie/domaci' in request.url.path %}
-                        text-white bg-blue-500 rounded-t-lg
-                      {% else %}
-                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
-                      {% endif %}">
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap rounded-t-lg transition-colors
+                      {% if '/kategorie/domaci' in request.url.path %}text-white bg-amber-500{% else %}text-gray-600 hover:text-amber-600 hover:bg-amber-100{% endif %}">
               🏠 Domácí
             </a>
           </li>
           <li>
             <a href="/kategorie/zahranici"
-               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
-                      {% if '/kategorie/zahranici' in request.url.path %}
-                        text-white bg-blue-500 rounded-t-lg
-                      {% else %}
-                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
-                      {% endif %}">
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap rounded-t-lg transition-colors
+                      {% if '/kategorie/zahranici' in request.url.path %}text-white bg-amber-500{% else %}text-gray-600 hover:text-amber-600 hover:bg-amber-100{% endif %}">
               🌍 Zahraničí
             </a>
           </li>
           <li>
             <a href="/kategorie/sport"
-               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
-                      {% if '/kategorie/sport' in request.url.path %}
-                        text-white bg-blue-500 rounded-t-lg
-                      {% else %}
-                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
-                      {% endif %}">
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap rounded-t-lg transition-colors
+                      {% if '/kategorie/sport' in request.url.path %}text-white bg-amber-500{% else %}text-gray-600 hover:text-amber-600 hover:bg-amber-100{% endif %}">
               ⚽ Sport
             </a>
           </li>
           <li>
             <a href="/kategorie/zviratka"
-               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap
-                      {% if '/kategorie/zviratka' in request.url.path %}
-                        text-white bg-blue-500 rounded-t-lg
-                      {% else %}
-                        text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-t-lg transition-colors
-                      {% endif %}">
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap rounded-t-lg transition-colors
+                      {% if '/kategorie/zviratka' in request.url.path %}text-white bg-amber-500{% else %}text-gray-600 hover:text-amber-600 hover:bg-amber-100{% endif %}">
               🐾 Zvířátka
             </a>
           </li>
           <li>
             <a href="/archiv"
-               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap
-                      {% if request.url.path == '/archiv' %}
-                        text-white bg-gray-400 rounded-t-lg
-                      {% else %}
-                        text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-t-lg transition-colors
-                      {% endif %}">
+               class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-t-lg transition-colors
+                      {% if request.url.path == '/archiv' %}text-white bg-gray-400{% else %}text-gray-400 hover:text-gray-600 hover:bg-gray-100{% endif %}">
               📚 Archiv
             </a>
           </li>
@@ -114,17 +198,17 @@
     </nav>
   </header>
 
-  <!-- Main content -->
+  <!-- Hlavní obsah -->
   <main class="flex-1 max-w-5xl mx-auto px-4 py-10 w-full">
     {% block content %}{% endblock %}
   </main>
 
   <!-- Footer -->
-  <footer class="bg-white border-t border-blue-100 mt-auto">
+  <footer class="bg-white border-t border-amber-100 mt-auto">
     <div class="max-w-5xl mx-auto px-4 py-6 text-center text-sm text-gray-400">
-      <p>🌍 Pozitivní zprávy – každý den vybíráme to nejlepší ze světového zpravodajství</p>
+      <p>🐾 Pozitivní zprávy – každý den vybíráme to nejlepší ze světového zpravodajství</p>
       <p class="mt-1">
-        Powered by <span class="text-blue-500 font-medium">Claude AI</span> &amp;
+        Powered by <span class="text-amber-500 font-medium">Claude AI</span> &amp;
         <span class="text-cyan-500 font-medium">Unsplash</span>
       </p>
     </div>
