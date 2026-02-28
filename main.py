@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, Form, Request, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
@@ -163,6 +163,11 @@ def archive(request: Request, db: Session = Depends(get_db)):
 # ─── SEO: robots.txt + sitemap.xml ────────────────────────────────────────────
 
 CATEGORIES = ["ekonomika", "domaci", "zahranici", "sport", "zviratka", "veda"]
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon_ico():
+    return FileResponse("static/favicon.ico", media_type="image/x-icon")
 
 
 @app.get("/robots.txt")
