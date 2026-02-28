@@ -29,6 +29,8 @@ class Article(Base):
     is_published = Column(Boolean, default=False)
     language = Column(String(10), default="cs")
     category = Column(String(50), default="ostatni")
+    # Tok zpráv: hotnews → category → archive
+    status = Column(String(20), default="hotnews")
 
 
 class Keyword(Base):
@@ -108,6 +110,11 @@ def init_db():
     with engine.connect() as conn:
         try:
             conn.execute(text("ALTER TABLE site_visits ADD COLUMN ip_address VARCHAR(100)"))
+            conn.commit()
+        except Exception:
+            pass  # sloupec už existuje
+        try:
+            conn.execute(text("ALTER TABLE articles ADD COLUMN status VARCHAR(20) DEFAULT 'category'"))
             conn.commit()
         except Exception:
             pass  # sloupec už existuje

@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Pozitivní zprávy{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="apple-touch-icon" href="/static/favicon.svg">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/static/style.css" />
   <style>
@@ -39,14 +41,38 @@
       0%   { opacity:1; transform: scale(1) rotate(2deg); }
       100% { opacity:0; transform: scale(0.6) translateY(-8px) rotate(-5deg); }
     }
-    .tail-wag    { transform-origin: 18px 60px; animation: wag 0.55s ease-in-out infinite; }
-    .tail-wag-fast { transform-origin: 18px 60px; animation: wag-fast 0.2s ease-in-out infinite; }
+    .tail-wag    { transform-origin: 33px 100px; animation: wag 0.55s ease-in-out infinite; }
+    .tail-wag-fast { transform-origin: 33px 100px; animation: wag-fast 0.2s ease-in-out infinite; }
     .eye-blink   { transform-origin: center center; animation: blink 3.5s ease-in-out infinite; }
     .dog-float   { animation: float 3s ease-in-out infinite; }
     .speech-pop  { animation: bubble-in 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
     #bark-bubble { transform-origin: 10% 90%; pointer-events:none; }
     #bark-bubble.show { animation: bark-pop 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards; }
     #bark-bubble.hide { animation: bark-out 0.35s ease-in forwards; }
+
+    /* ── Chodicí perokresba ── */
+    @keyframes dog-stroll {
+      0%   { left: -110px;             transform: scaleX(1);  }
+      49%  { left: calc(100% + 10px); transform: scaleX(1);  }
+      51%  { left: calc(100% + 10px); transform: scaleX(-1); }
+      100% { left: -110px;             transform: scaleX(-1); }
+    }
+    @keyframes wlega {
+      0%, 100% { transform: rotate(22deg); }
+      50%      { transform: rotate(-16deg); }
+    }
+    @keyframes wlegb {
+      0%, 100% { transform: rotate(-16deg); }
+      50%      { transform: rotate(22deg); }
+    }
+    @keyframes wtail {
+      0%, 100% { transform: rotate(-14deg); }
+      50%      { transform: rotate(18deg); }
+    }
+    .wd-pos { position:absolute; bottom:14px; animation: dog-stroll 20s linear infinite; }
+    .walk-leg-a { transform-box:fill-box; transform-origin:top center; animation: wlega 0.45s ease-in-out infinite; }
+    .walk-leg-b { transform-box:fill-box; transform-origin:top center; animation: wlegb 0.45s ease-in-out infinite; }
+    .walk-tail  { transform-box:fill-box; transform-origin:100% 100%;  animation: wtail 0.5s  ease-in-out infinite; }
   </style>
 </head>
 <body class="bg-[#FFFBF4] text-gray-800 min-h-screen flex flex-col">
@@ -56,26 +82,14 @@
           style="background: linear-gradient(160deg, #FFF8E1 0%, #FFF3E0 40%, #FFF9F0 70%, #F0F7FF 100%);">
 
     <div class="max-w-5xl mx-auto px-4 pt-4 pb-1">
-      <div class="flex items-center justify-center gap-4 sm:gap-10">
+      <div class="relative flex items-center justify-center" style="min-height:130px;">
 
-        <!-- ── Psí maskot (schovaný na mobilech) ── -->
-        <div id="dog-wrap" class="relative hidden sm:block flex-shrink-0" style="width:96px; height:100px; cursor:pointer;">
-
-          <!-- Bublina se štekem -->
-          <div class="speech-pop absolute z-10 whitespace-nowrap"
-               style="top:-10px; left:54px;">
-            <div class="relative bg-amber-400 text-amber-900 font-bold px-3 py-1.5 rounded-2xl shadow-lg text-xs leading-snug"
-                 style="font-size:0.68rem;">
-              Woof! Jen dobré zprávy!&nbsp;🗞️
-              <!-- šipka doleva -->
-              <span class="absolute top-1/2 -translate-y-1/2 -left-2.5"
-                    style="width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-right:10px solid #FBBF24;"></span>
-            </div>
-          </div>
+        <!-- ── Psí maskot ── -->
+        <div id="dog-wrap" class="absolute left-0 hidden sm:block flex-shrink-0" style="width:124px; height:130px; cursor:pointer;">
 
           <!-- Barková bublina (vyskočí z pusy při hover) -->
           <div id="bark-bubble"
-               style="position:absolute; bottom:28px; right:-92px; opacity:0; z-index:20; white-space:nowrap;">
+               style="position:absolute; bottom:32px; right:-96px; opacity:0; z-index:20; white-space:nowrap;">
             <div style="background:#FBBF24; border:3px solid #D97706; border-radius:10px;
                         padding:5px 10px; font-weight:900; color:#78350F; font-size:0.8rem;
                         transform:rotate(2deg); box-shadow:3px 3px 0 #D97706; position:relative;">
@@ -90,85 +104,121 @@
             </div>
           </div>
 
-          <!-- SVG Psík -->
-          <svg class="dog-float" width="92" height="98" viewBox="0 0 120 130"
+          <!-- SVG Border Kolie -->
+          <svg class="dog-float" width="120" height="128" viewBox="0 0 120 130"
                fill="none" xmlns="http://www.w3.org/2000/svg">
 
-            <!-- Ocásek (mává, při štěkání rychleji) -->
+            <!-- Ocásek (vztyčený nahoru – veselý pes) -->
             <g id="dog-tail" class="tail-wag">
-              <path d="M 26 88 Q 6 72 10 52 Q 13 38 24 42"
-                    stroke="#B5661E" stroke-width="9" fill="none" stroke-linecap="round"/>
+              <!-- Tmavý ocásek – od těla vzhůru -->
+              <path d="M 33 102 Q 16 78 22 54"
+                    stroke="#1C1C1C" stroke-width="10" fill="none" stroke-linecap="round"/>
+              <!-- Bílá špička ocásku (jen konec) -->
+              <path d="M 19 66 Q 16 59 22 54"
+                    stroke="#F0F0F0" stroke-width="8" fill="none" stroke-linecap="round"/>
             </g>
 
-            <!-- Tělo -->
-            <ellipse cx="60" cy="103" rx="33" ry="21" fill="#E8A87C"/>
+            <!-- Tělo (černé) -->
+            <ellipse cx="62" cy="103" rx="31" ry="20" fill="#1C1C1C"/>
+            <!-- Bílý hrudník -->
+            <ellipse cx="62" cy="106" rx="17" ry="13" fill="#F0F0F0"/>
 
-            <!-- Tlapky -->
-            <ellipse cx="43" cy="120" rx="12" ry="7" fill="#D4936A"/>
-            <ellipse cx="77" cy="120" rx="12" ry="7" fill="#D4936A"/>
+            <!-- Tlapky (bílé) -->
+            <ellipse cx="46" cy="121" rx="11" ry="6" fill="#F0F0F0"/>
+            <ellipse cx="78" cy="121" rx="11" ry="6" fill="#F0F0F0"/>
+            <!-- Prstíky -->
+            <path d="M 40 119 Q 40 116 42 118" stroke="#C8C8C8" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <path d="M 46 117 Q 46 114 48 116" stroke="#C8C8C8" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <path d="M 52 119 Q 52 116 54 118" stroke="#C8C8C8" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <path d="M 72 119 Q 72 116 74 118" stroke="#C8C8C8" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <path d="M 78 117 Q 78 114 80 116" stroke="#C8C8C8" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <path d="M 84 119 Q 84 116 86 118" stroke="#C8C8C8" stroke-width="1.5" fill="none" stroke-linecap="round"/>
 
-            <!-- Levé ucho (visící) -->
-            <ellipse cx="33" cy="43" rx="14" ry="21"
-                     fill="#C17A45" transform="rotate(-18, 33, 43)"/>
-            <ellipse cx="33" cy="45" rx="8" ry="14"
-                     fill="#FFCDB2" transform="rotate(-18, 33, 45)"/>
+            <!-- Bílý límec/přechod hrudník–hlava -->
+            <ellipse cx="62" cy="86" rx="18" ry="8" fill="#E8E8E8"/>
 
-            <!-- Pravé ucho (visící) -->
-            <ellipse cx="87" cy="43" rx="14" ry="21"
-                     fill="#C17A45" transform="rotate(18, 87, 43)"/>
-            <ellipse cx="87" cy="45" rx="8" ry="14"
-                     fill="#FFCDB2" transform="rotate(18, 87, 45)"/>
+            <!-- Levé ucho (semi-erect – typická BC) -->
+            <path d="M 37 52 Q 30 38 32 24 Q 36 14 44 20 Q 46 33 44 52 Z" fill="#1C1C1C"/>
+            <!-- Vnitřek levého ucha (tmavě růžový nádech) -->
+            <path d="M 38 50 Q 33 38 35 27 Q 38 20 43 24 Q 44 34 43 50 Z" fill="#4A2020" opacity="0.5"/>
+            <!-- Přeložená špička levého ucha -->
+            <path d="M 32 24 Q 36 14 44 20 Q 40 27 34 28 Z" fill="#2A2A2A"/>
 
-            <!-- Hlava -->
-            <circle cx="60" cy="63" r="31" fill="#E8A87C"/>
+            <!-- Pravé ucho (semi-erect) -->
+            <path d="M 87 52 Q 94 38 92 24 Q 88 14 80 20 Q 78 33 80 52 Z" fill="#1C1C1C"/>
+            <!-- Vnitřek pravého ucha -->
+            <path d="M 86 50 Q 91 38 89 27 Q 86 20 81 24 Q 80 34 81 50 Z" fill="#4A2020" opacity="0.5"/>
+            <!-- Přeložená špička pravého ucha -->
+            <path d="M 92 24 Q 88 14 80 20 Q 84 27 90 28 Z" fill="#2A2A2A"/>
 
-            <!-- Bělmo levé oko -->
-            <circle cx="48" cy="58" r="8" fill="white"/>
-            <!-- Bělmo pravé oko -->
-            <circle cx="72" cy="58" r="8" fill="white"/>
+            <!-- Hlava (černá) -->
+            <ellipse cx="62" cy="64" rx="27" ry="25" fill="#1C1C1C"/>
+
+            <!-- Bílá lyska (čelo → čumák) -->
+            <ellipse cx="62" cy="55" rx="7.5" ry="13" fill="#F0F0F0"/>
+
+            <!-- Šedý čumák -->
+            <ellipse cx="62" cy="75" rx="13" ry="10" fill="#C8C8C8"/>
+            <!-- Přechod čumák–hlava -->
+            <ellipse cx="62" cy="68" rx="10" ry="6" fill="#282828"/>
+
+            <!-- Bělmo levého oka -->
+            <ellipse cx="50" cy="60" rx="8" ry="7" fill="white"/>
+            <!-- Bělmo pravého oka -->
+            <ellipse cx="74" cy="60" rx="8" ry="7" fill="white"/>
 
             <!-- Zornice (blikají) -->
             <g class="eye-blink">
-              <circle cx="49" cy="59" r="4.5" fill="#2D1B0E"/>
-              <circle cx="73" cy="59" r="4.5" fill="#2D1B0E"/>
+              <!-- Duhovka – jantarová (typická BC) -->
+              <circle cx="51" cy="61" r="5.5" fill="#A07820"/>
+              <circle cx="75" cy="61" r="5.5" fill="#A07820"/>
+              <!-- Zornice -->
+              <circle cx="51" cy="61" r="3.2" fill="#0D0D0D"/>
+              <circle cx="75" cy="61" r="3.2" fill="#0D0D0D"/>
             </g>
 
             <!-- Třpyt v oku -->
-            <circle cx="51" cy="56.5" r="1.8" fill="white"/>
-            <circle cx="75" cy="56.5" r="1.8" fill="white"/>
+            <circle cx="53" cy="59" r="1.6" fill="white"/>
+            <circle cx="77" cy="59" r="1.6" fill="white"/>
+            <circle cx="49.5" cy="63.5" r="0.8" fill="white" opacity="0.6"/>
+            <circle cx="73.5" cy="63.5" r="0.8" fill="white" opacity="0.6"/>
 
-            <!-- Nos -->
-            <ellipse cx="60" cy="71" rx="6.5" ry="4.5" fill="#2D1B0E"/>
+            <!-- Obočí (jantarová/hnědá – výrazný výraz BC) -->
+            <path d="M 42 51 Q 48 48 54 51" stroke="#A07820" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <path d="M 70 51 Q 76 48 82 51" stroke="#A07820" stroke-width="2" fill="none" stroke-linecap="round"/>
 
+            <!-- Nos (malý, černý) -->
+            <ellipse cx="62" cy="73" rx="5" ry="3.5" fill="#0D0D0D"/>
+            <ellipse cx="60.5" cy="72" rx="1.5" ry="1" fill="#2A2A2A" opacity="0.5"/>
             <!-- Nosní dírky -->
-            <ellipse cx="57.5" cy="72.5" rx="1.2" ry="1" fill="#1a0f08"/>
-            <ellipse cx="62.5" cy="72.5" rx="1.2" ry="1" fill="#1a0f08"/>
+            <ellipse cx="59.5" cy="74" rx="1" ry="0.8" fill="#050505"/>
+            <ellipse cx="64.5" cy="74" rx="1" ry="0.8" fill="#050505"/>
 
             <!-- Úsměv -->
-            <path d="M 49 78 Q 60 87 71 78"
-                  stroke="#2D1B0E" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+            <path d="M 53 78 Q 62 86 71 78"
+                  stroke="#1A1A1A" stroke-width="2.2" fill="none" stroke-linecap="round"/>
 
             <!-- Jazyk -->
-            <ellipse cx="60" cy="85" rx="8" ry="6.5" fill="#FF8FAB"/>
-            <line x1="60" y1="78" x2="60" y2="91.5"
-                  stroke="#E5607A" stroke-width="1.8"/>
+            <ellipse cx="62" cy="85" rx="7.5" ry="6.5" fill="#FF8FAB"/>
+            <ellipse cx="62" cy="89" rx="6.5" ry="3.5" fill="#FFA8C0" opacity="0.55"/>
+            <line x1="62" y1="79" x2="62" y2="91" stroke="#E5607A" stroke-width="1.5"/>
 
-            <!-- Červenání na tvářích -->
-            <ellipse cx="39" cy="68" rx="7" ry="4.5" fill="#FFB3C6" opacity="0.45"/>
-            <ellipse cx="81" cy="68" rx="7" ry="4.5" fill="#FFB3C6" opacity="0.45"/>
+            <!-- Jemné červenání na tvářích -->
+            <ellipse cx="39" cy="68" rx="7" ry="4.5" fill="#FFB3C6" opacity="0.2"/>
+            <ellipse cx="85" cy="68" rx="7" ry="4.5" fill="#FFB3C6" opacity="0.2"/>
           </svg>
         </div>
 
         <!-- ── Název webu ── -->
         <a href="/" class="inline-flex flex-col items-center gap-1 group">
           <div class="flex items-center gap-2">
-            <span class="text-4xl sm:text-5xl font-extrabold tracking-tight leading-none"
+            <span class="text-5xl sm:text-6xl font-extrabold tracking-tight leading-none"
                   style="background: linear-gradient(135deg,#F59E0B 0%,#EF4444 50%,#EC4899 100%);
                          -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">
               Pozitivní zprávy
             </span>
           </div>
-          <p class="text-sm text-amber-500 font-semibold tracking-wide mt-0.5">
+          <p class="text-base sm:text-lg text-amber-500 font-semibold tracking-wide mt-1">
             🌞 Každý den vybíráme to nejlepší ze světa 🌞
           </p>
         </a>

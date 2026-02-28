@@ -1,11 +1,13 @@
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from database import SessionLocal, Article, Keyword, NewsSource, Setting
+
+ARCHIVE_AFTER_DAYS = 10
 from scraper import fetch_all_feeds
 from evaluator import evaluate_batch
 from article_generator import generate_article
@@ -105,6 +107,26 @@ def run_scrape_job():
 
     db = SessionLocal()
     try:
+        # ── Přesun zpráv: hotnews → category, category → archive ──────────────
+        # Všechny hotnews z minulého scrapování přejdou do kategorií
+        promoted = (
+            db.query(Article)
+            .filter(Article.status == "hotnews")
+            .update({"status": "category"}, synchronize_session=False)
+        )
+        # Zprávy v kategoriích starší než ARCHIVE_AFTER_DAYS dní jdou do archivu
+        archive_cutoff = datetime.utcnow() - timedelta(days=ARCHIVE_AFTER_DAYS)
+        archived = (
+            db.query(Article)
+            .filter(Article.status == "category", Article.created_at < archive_cutoff)
+            .update({"status": "archive"}, synchronize_session=False)
+        )
+        db.commit()
+        if promoted:
+            logger.info(f"Přesunuto hotnews→category: {promoted} článků")
+        if archived:
+            logger.info(f"Přesunuto category→archive: {archived} článků")
+
         sources = db.query(NewsSource).filter(NewsSource.enabled == True).all()
         keywords = db.query(Keyword).all()
 
@@ -179,6 +201,7 @@ def run_scrape_job():
                 is_published=True,
                 language=raw["language"],
                 category=raw.get("category", "ostatni"),
+                status="hotnews",
             )
             db.add(article)
             logger.info(f"Přidán článek: {generated['headline'][:60]} (score: {raw['positivity_score']})")

@@ -1,11 +1,11 @@
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, Form, Request, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
@@ -24,7 +24,7 @@ from scheduler import (
     get_max_articles, set_max_articles,
 )
 
-ARCHIVE_DAYS = 14
+ARCHIVE_AFTER_DAYS = 10  # Po tolika dnech přejdou zprávy z kategorií do archivu
 
 
 def _get_client_ip(request: Request) -> str:
@@ -62,10 +62,10 @@ def homepage(request: Request, db: Session = Depends(get_db)):
     db.add(SiteVisit(path="/", ip_address=_get_client_ip(request)))
     db.commit()
 
-    cutoff = datetime.utcnow() - timedelta(days=ARCHIVE_DAYS)
+    # Homepage = Hot News: pouze nejnovější scrape (status="hotnews")
     articles = (
         db.query(Article)
-        .filter(Article.is_published == True, Article.created_at >= cutoff)
+        .filter(Article.is_published == True, Article.status == "hotnews")
         .order_by(Article.positivity_score.desc())
         .limit(24)
         .all()
@@ -144,14 +144,95 @@ def rate_article(
 
 @app.get("/archiv", response_class=HTMLResponse)
 def archive(request: Request, db: Session = Depends(get_db)):
+    # Archiv = zprávy starší než ARCHIVE_AFTER_DAYS dní (status="archive")
     articles = (
         db.query(Article)
+        .filter(Article.is_published == True, Article.status == "archive")
         .order_by(Article.created_at.desc())
-        .limit(50)
+        .limit(200)
         .all()
     )
-    return templates.TemplateResponse("archive.html", {"request": request, "articles": articles})
+    return templates.TemplateResponse("archive.html", {
+        "request": request,
+        "articles": articles,
+        "page_title": "📚 Archiv",
+        "page_subtitle": f"Zprávy starší než {ARCHIVE_AFTER_DAYS} dní",
+    })
 
+
+# ─── SEO: robots.txt + sitemap.xml ────────────────────────────────────────────
+
+CATEGORIES = ["ekonomika", "domaci", "zahranici", "sport", "zviratka", "veda"]
+
+
+@app.get("/robots.txt")
+def robots_txt(request: Request):
+    base = str(request.base_url).rstrip("/")
+    content = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /admin/\n"
+        "Disallow: /api/\n"
+        f"Sitemap: {base}/sitemap.xml\n"
+    )
+    return Response(content=content, media_type="text/plain")
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml(request: Request, db: Session = Depends(get_db)):
+    base = str(request.base_url).rstrip("/")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    urls = []
+
+    # Statické stránky
+    urls.append({"loc": f"{base}/",         "lastmod": today, "changefreq": "daily",  "priority": "1.0"})
+    urls.append({"loc": f"{base}/archiv",   "lastmod": today, "changefreq": "weekly", "priority": "0.5"})
+    for cat in CATEGORIES:
+        urls.append({"loc": f"{base}/kategorie/{cat}", "lastmod": today, "changefreq": "daily", "priority": "0.7"})
+
+    # Všechny publikované články
+    articles = (
+        db.query(Article)
+        .filter(Article.is_published == True)
+        .order_by(Article.published_at.desc())
+        .all()
+    )
+    for art in articles:
+        lastmod = art.published_at.strftime("%Y-%m-%d") if art.published_at else today
+        if art.status == "hotnews":
+            priority, changefreq = "0.9", "daily"
+        elif art.status == "category":
+            priority, changefreq = "0.8", "weekly"
+        else:
+            priority, changefreq = "0.5", "monthly"
+        urls.append({
+            "loc": f"{base}/clanek/{art.id}",
+            "lastmod": lastmod,
+            "changefreq": changefreq,
+            "priority": priority,
+        })
+
+    url_blocks = "\n".join(
+        f"  <url>\n"
+        f"    <loc>{u['loc']}</loc>\n"
+        f"    <lastmod>{u['lastmod']}</lastmod>\n"
+        f"    <changefreq>{u['changefreq']}</changefreq>\n"
+        f"    <priority>{u['priority']}</priority>\n"
+        f"  </url>"
+        for u in urls
+    )
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{url_blocks}\n"
+        "</urlset>"
+    )
+    return Response(content=xml, media_type="application/xml")
+
+
+# ───────────────────────────────────────────────────────────────────────────────
 
 CATEGORY_NAMES = {
     "ekonomika": "Ekonomika",
@@ -182,10 +263,10 @@ def category_page(category: str, request: Request, db: Session = Depends(get_db)
     db.add(SiteVisit(path=f"/kategorie/{category}", ip_address=_get_client_ip(request)))
     db.commit()
 
-    cutoff = datetime.utcnow() - timedelta(days=ARCHIVE_DAYS)
+    # Kategorie = zprávy po prvním přesunu z hotnews (status="category")
     articles = (
         db.query(Article)
-        .filter(Article.is_published == True, Article.category == category, Article.created_at >= cutoff)
+        .filter(Article.is_published == True, Article.category == category, Article.status == "category")
         .order_by(Article.created_at.desc())
         .limit(50)
         .all()
@@ -195,7 +276,7 @@ def category_page(category: str, request: Request, db: Session = Depends(get_db)
         "request": request,
         "articles": articles,
         "page_title": f"{icon} {CATEGORY_NAMES[category]}",
-        "page_subtitle": f"Pozitivní zprávy v kategorii {CATEGORY_NAMES[category]} – posledních {ARCHIVE_DAYS} dní",
+        "page_subtitle": f"Pozitivní zprávy v kategorii {CATEGORY_NAMES[category]} – posledních {ARCHIVE_AFTER_DAYS} dní",
     })
 
 
